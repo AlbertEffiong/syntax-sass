@@ -1,0 +1,502 @@
+openapi: 3.0.3
+info:
+  title: Syntax SaaS API
+  version: 1.0.0
+  description: |
+    Secure multi-tenant School Management & Result Checking API.
+
+    **Auth**: send the JWT either as an httpOnly cookie (set by the login
+    endpoints) or as `Authorization: Bearer <token>`. Cookie-authenticated
+    state-changing requests must also echo the `x-csrf-token` header (read from
+    the `csrfToken` cookie).
+  contact:
+    name: Syntax SaaS
+servers:
+  - url: http://localhost:4000
+    description: Local development
+tags:
+  - name: Auth
+  - name: Owner
+  - name: Admin
+  - name: Teacher
+  - name: Student
+paths:
+  /health:
+    get:
+      tags: [Auth]
+      summary: Liveness probe
+      security: []
+      responses:
+        '200': { description: Service is up }
+  /ready:
+    get:
+      tags: [Auth]
+      summary: Readiness probe (checks DB connection)
+      security: []
+      responses:
+        '200': { description: Ready }
+        '503': { description: Database unavailable }
+  /api/auth/register-school:
+    post:
+      tags: [Auth]
+      summary: SaaS Owner onboards a school
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, uniqueSchoolPrefix]
+              properties:
+                name: { type: string, example: Bright Future Academy }
+                email: { type: string, format: email, example: admin@brightfuture.edu }
+                password: { type: string, example: Admin@12345 }
+                uniqueSchoolPrefix: { type: string, example: BFA }
+                principalName: { type: string, example: Mrs. Ada Okon }
+                planMonthly: { type: number, example: 49 }
+      responses:
+        '201': { description: School created }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: Email or prefix already used }
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Multi-role login (owner/admin/teacher/student)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role, password]
+              properties:
+                role: { type: string, enum: [owner, admin, teacher, student] }
+                email: { type: string, format: email }
+                studentId: { type: string, example: BFA/2026/001 }
+                password: { type: string }
+      responses:
+        '200': { description: Login successful (sets auth + csrf cookies) }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/auth/invite-teacher:
+    post:
+      tags: [Auth]
+      summary: School admin invites a teacher (emails an OTP)
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                subject: { type: string }
+      responses:
+        '201': { description: Teacher invited }
+        '409': { description: Email already registered }
+  /api/auth/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Activate a teacher with the OTP and set their password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp, password]
+              properties:
+                email: { type: string, format: email }
+                otp: { type: string, example: '123456' }
+                password: { type: string }
+      responses:
+        '200': { description: Account activated }
+        '400': { description: Invalid or expired OTP }
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Current principal
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Clear session cookies
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200': { description: Logged out }
+  /api/owner/dashboard:
+    get:
+      tags: [Owner]
+      summary: Platform metrics (MRR, active/expired schools)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /api/owner/schools:
+    get:
+      tags: [Owner]
+      summary: List schools (paginated, filterable)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20 } }
+        - { name: status, in: query, schema: { type: string, enum: [Active, Expired, all] } }
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Paginated schools }
+  /api/owner/schools/{id}/status:
+    patch:
+      tags: [Owner]
+      summary: Lock/unlock a school subscription
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [Active, Expired] }
+      responses:
+        '200': { description: Updated }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/owner/verify-payment:
+    post:
+      tags: [Owner]
+      summary: Verify an OPay bank transfer and reactivate a school
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [schoolId, reference]
+              properties:
+                schoolId: { type: string }
+                reference: { type: string }
+                amount: { type: number }
+      responses:
+        '200': { description: Reactivated }
+        '400': { description: No pending payment / reference mismatch }
+  /api/admin/school:
+    get:
+      tags: [Admin]
+      summary: Get own school profile/settings
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /api/admin/academic-setting:
+    patch:
+      tags: [Admin]
+      summary: Update academic calendar (session/term)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                currentSession: { type: string, example: 2026/2027 }
+                currentTerm: { type: string, example: Second Term }
+                termsPerSession: { type: integer, example: 3 }
+      responses:
+        '200': { description: Updated }
+  /api/admin/classes:
+    post:
+      tags: [Admin]
+      summary: Create a class and map its curriculum subjects
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [className, subjects]
+              properties:
+                className: { type: string, example: JSS 1A }
+                subjects: { type: array, items: { type: string }, example: [Mathematics, English Language] }
+                teacherEmail: { type: string, format: email }
+      responses:
+        '201': { description: Created }
+        '409': { description: Class already exists }
+    get:
+      tags: [Admin]
+      summary: List classes
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /api/admin/students:
+    post:
+      tags: [Admin]
+      summary: Enroll a student (auto-generates [PREFIX]/[YEAR]/[SEQ] id)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName, gender, dob, currentClass, password]
+              properties:
+                fullName: { type: string }
+                gender: { type: string, enum: [Male, Female] }
+                dob: { type: string, format: date }
+                currentClass: { type: string }
+                password: { type: string }
+      responses:
+        '201': { description: Enrolled }
+        '400': { description: Class not configured / weak password }
+    get:
+      tags: [Admin]
+      summary: List students (paginated)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20 } }
+        - { name: currentClass, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Paginated students }
+  /api/admin/teachers:
+    get:
+      tags: [Admin]
+      summary: List teachers (paginated)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Paginated teachers }
+  /api/admin/teachers/{id}:
+    patch:
+      tags: [Admin]
+      summary: Update a teacher (name/subject)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                subject: { type: string }
+      responses:
+        '200': { description: Updated }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Admin]
+      summary: Remove a teacher
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Removed }
+  /api/admin/pending-assessments:
+    get:
+      tags: [Admin]
+      summary: Review teacher submissions (paginated)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [Pending Approval, Approved, Revised, all] } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: Paginated assessments }
+    post:
+      tags: [Admin]
+      summary: Approve or reject a submission
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assessmentId, action]
+              properties:
+                assessmentId: { type: string }
+                action: { type: string, enum: [approve, reject] }
+                note: { type: string }
+      responses:
+        '200': { description: Reviewed }
+  /api/admin/subscription/bank-transfer:
+    post:
+      tags: [Admin]
+      summary: Submit an OPay payment reference for verification
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reference, amount]
+              properties:
+                reference: { type: string }
+                amount: { type: number }
+      responses:
+        '200': { description: Submitted }
+  /api/teacher/classes-subjects:
+    get:
+      tags: [Teacher]
+      summary: Classes + subjects (synced from the admin curriculum)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+  /api/teacher/broadsheet:
+    get:
+      tags: [Teacher]
+      summary: Fetch a saved broadsheet
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: classId, in: query, required: true, schema: { type: string } }
+        - { name: subject, in: query, required: true, schema: { type: string } }
+        - { name: term, in: query, required: true, schema: { type: string } }
+        - { name: session, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+  /api/teacher/broadsheet/save:
+    post:
+      tags: [Teacher]
+      summary: Save/update CA1, CA2 and Exam scores
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [classId, subject, term, session, entries]
+              properties:
+                classId: { type: string }
+                subject: { type: string }
+                term: { type: string }
+                session: { type: string }
+                entries:
+                  type: array
+                  items:
+                    type: object
+                    required: [studentId, ca1, ca2, exam]
+                    properties:
+                      studentId: { type: string }
+                      ca1: { type: number, maximum: 20 }
+                      ca2: { type: number, maximum: 20 }
+                      exam: { type: number, maximum: 60 }
+      responses:
+        '200': { description: Saved }
+        '400': { description: Subject not in curriculum }
+  /api/teacher/broadsheet/submit:
+    post:
+      tags: [Teacher]
+      summary: Submit finalised scores to the admin for approval
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [classId, subject, term, session]
+              properties:
+                classId: { type: string }
+                subject: { type: string }
+                term: { type: string }
+                session: { type: string }
+                principalName: { type: string }
+      responses:
+        '200': { description: Submitted }
+        '400': { description: Nothing to submit }
+  /api/student/login:
+    post:
+      tags: [Student]
+      summary: Student/parent login (Student ID + password)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [studentId, password]
+              properties:
+                studentId: { type: string, example: BFA/2026/001 }
+                password: { type: string }
+      responses:
+        '200': { description: Login successful }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/student/results:
+    get:
+      tags: [Student]
+      summary: Termly report card (subscription-gated)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: term, in: query, schema: { type: string } }
+        - { name: session, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Report card }
+        '403': { description: Subscription inactive }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+  responses:
+    BadRequest:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Authentication required or invalid
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Insufficient permissions or cross-tenant access
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error:
+          type: object
+          properties:
+            message: { type: string }
+            code: { type: string }
+            details: {}

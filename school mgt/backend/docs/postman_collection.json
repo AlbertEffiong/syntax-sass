@@ -1,0 +1,357 @@
+{
+  "info": {
+    "name": "Syntax SaaS API",
+    "description": "Secure multi-tenant School Management & Result Checking API.\n\nLogin requests save the JWT into the {{token}} collection variable and the CSRF token into {{csrfToken}}. Cookie-authenticated mutations send x-csrf-token automatically.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "token", "value": "" },
+    { "key": "csrfToken", "value": "" },
+    { "key": "schoolId", "value": "" },
+    { "key": "classId", "value": "" },
+    { "key": "studentId", "value": "" },
+    { "key": "teacherId", "value": "" },
+    { "key": "assessmentId", "value": "" },
+    { "key": "term", "value": "First Term" },
+    { "key": "session", "value": "2026/2027" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Attach CSRF header for cookie-authenticated state-changing requests.",
+          "const method = pm.request.method;",
+          "const unsafe = ['POST','PUT','PATCH','DELETE'].includes(method);",
+          "const exempt = ['/api/auth/login','/api/auth/register-school','/api/auth/verify-otp','/api/student/login'];",
+          "const path = pm.request.url.getPath();",
+          "if (unsafe && !exempt.includes(path)) {",
+          "  const csrf = pm.collectionVariables.get('csrfToken');",
+          "  if (csrf) pm.request.headers.upsert({ key: 'x-csrf-token', value: csrf });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register School (owner)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/register-school",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bright Future Academy\",\n  \"email\": \"admin@brightfuture.edu\",\n  \"password\": \"Admin@12345\",\n  \"uniqueSchoolPrefix\": \"BFA\",\n  \"principalName\": \"Mrs. Ada Okon\",\n  \"planMonthly\": 49\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('schoolId', pm.response.json().data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"admin\",\n  \"email\": \"admin@brightfuture.edu\",\n  \"password\": \"Admin@12345\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data) {",
+                  "  pm.collectionVariables.set('token', j.data.token);",
+                  "  pm.collectionVariables.set('csrfToken', j.data.csrfToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invite Teacher",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/invite-teacher",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mr. Segun Obi\",\n  \"email\": \"teacher@brightfuture.edu\",\n  \"subject\": \"Mathematics\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data && j.data.teacher) pm.collectionVariables.set('teacherId', j.data.teacher.id);",
+                  "if (j.data && j.data.otp) pm.collectionVariables.set('otp', j.data.otp);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/auth/verify-otp",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"teacher@brightfuture.edu\",\n  \"otp\": \"{{otp}}\",\n  \"password\": \"Teach@12345\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Me",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/auth/me" }
+        },
+        {
+          "name": "Logout",
+          "request": { "method": "POST", "url": "{{baseUrl}}/api/auth/logout" }
+        }
+      ]
+    },
+    {
+      "name": "Owner",
+      "item": [
+        { "name": "Dashboard", "request": { "method": "GET", "url": "{{baseUrl}}/api/owner/dashboard" } },
+        {
+          "name": "List Schools",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/owner/schools?page=1&limit=20&status=all"
+          }
+        },
+        {
+          "name": "Set School Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/owner/schools/{{schoolId}}/status",
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"Active\"\n}" }
+          }
+        },
+        {
+          "name": "Verify Payment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/owner/verify-payment",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schoolId\": \"{{schoolId}}\",\n  \"reference\": \"OPAY-REF-778812\",\n  \"amount\": 49\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        { "name": "Get School Settings", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/school" } },
+        {
+          "name": "Update Academic Setting",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/admin/academic-setting",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentSession\": \"2026/2027\",\n  \"currentTerm\": \"First Term\",\n  \"termsPerSession\": 3\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Class",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/admin/classes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"className\": \"JSS 1A\",\n  \"subjects\": [\"Mathematics\", \"English Language\"]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('classId', pm.response.json().data.id);"]
+              }
+            }
+          ]
+        },
+        { "name": "List Classes", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/classes" } },
+        {
+          "name": "Enroll Student",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/admin/students",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Tunde Bakare\",\n  \"gender\": \"Male\",\n  \"dob\": \"2012-03-14\",\n  \"currentClass\": \"JSS 1A\",\n  \"password\": \"Pupil@12345\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('studentId', pm.response.json().data.studentId);"]
+              }
+            }
+          ]
+        },
+        { "name": "List Students", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/students?page=1&limit=20" } },
+        { "name": "List Teachers", "request": { "method": "GET", "url": "{{baseUrl}}/api/admin/teachers" } },
+        {
+          "name": "Update Teacher",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/admin/teachers/{{teacherId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"subject\": \"Further Mathematics\"\n}" }
+          }
+        },
+        {
+          "name": "Remove Teacher",
+          "request": { "method": "DELETE", "url": "{{baseUrl}}/api/admin/teachers/{{teacherId}}" }
+        },
+        {
+          "name": "List Pending Assessments",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/admin/pending-assessments?status=Pending%20Approval"
+          }
+        },
+        {
+          "name": "Review Assessment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/admin/pending-assessments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assessmentId\": \"{{assessmentId}}\",\n  \"action\": \"approve\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Submit Bank Transfer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/admin/subscription/bank-transfer",
+            "body": { "mode": "raw", "raw": "{\n  \"reference\": \"OPAY-REF-778812\",\n  \"amount\": 49\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Teacher",
+      "item": [
+        { "name": "Classes & Subjects", "request": { "method": "GET", "url": "{{baseUrl}}/api/teacher/classes-subjects" } },
+        {
+          "name": "Get Broadsheet",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/teacher/broadsheet?classId={{classId}}&subject=Mathematics&term={{term}}&session={{session}}"
+          }
+        },
+        {
+          "name": "Save Broadsheet",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/teacher/broadsheet/save",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"classId\": \"{{classId}}\",\n  \"subject\": \"Mathematics\",\n  \"term\": \"{{term}}\",\n  \"session\": \"{{session}}\",\n  \"entries\": [\n    { \"studentId\": \"{{studentId}}\", \"ca1\": 18, \"ca2\": 17, \"exam\": 55 }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Submit Broadsheet",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/teacher/broadsheet/submit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"classId\": \"{{classId}}\",\n  \"subject\": \"Mathematics\",\n  \"term\": \"{{term}}\",\n  \"session\": \"{{session}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Student",
+      "item": [
+        {
+          "name": "Student Login",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/student/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{studentId}}\",\n  \"password\": \"Pupil@12345\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.data) { pm.collectionVariables.set('token', j.data.token); pm.collectionVariables.set('csrfToken', j.data.csrfToken); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Results",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/student/results  " }
+        }
+      ]
+    }
+  ]
+}
