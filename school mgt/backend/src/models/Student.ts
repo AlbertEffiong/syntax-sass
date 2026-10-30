@@ -100,4 +100,6 @@ const studentSchema = new Schema<IStudentDocument>(
 
 studentSchema.index({ schoolId: 1, currentClass: 1 });
 
+studentSchema.index({ schoolId: 1, fullName: 1 });
+
 export const Student = model<IStudentDocument, Model<IStudentDocument>>('Student', studentSchema);

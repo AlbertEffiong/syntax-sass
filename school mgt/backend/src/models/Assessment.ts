@@ -71,6 +71,8 @@ assessmentSchema.index(
   { schoolId: 1, classId: 1, subject: 1, studentRef: 1, term: 1, session: 1 },
   { unique: true },
 );
+assessmentSchema.index({ schoolId: 1, status: 1, submittedAt: -1 });
+assessmentSchema.index({ schoolId: 1, classId: 1, subject: 1, term: 1, session: 1 });
 
 export const Assessment = model<IAssessmentDocument, Model<IAssessmentDocument>>(
   'Assessment',

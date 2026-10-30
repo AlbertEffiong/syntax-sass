@@ -138,11 +138,16 @@ export async function listStudents(
   const filter: Record<string, unknown> = { schoolId };
   if (currentClass) filter.currentClass = currentClass;
 
+  const key = `students:${schoolId}:${currentClass ?? ''}:${pagination.page}:${pagination.limit}`;
+  const cached = cache.get<Paginated<StudentPublic>>(key);
+  if (cached) return cached;
   const [rows, total] = await Promise.all([
     Student.find(filter).sort({ fullName: 1 }).skip(pagination.skip).limit(pagination.limit),
     Student.countDocuments(filter),
   ]);
-  return paginate(rows.map(serializeStudent), total, pagination.page, pagination.limit);
+  const result = paginate(rows.map(serializeStudent), total, pagination.page, pagination.limit);
+  cache.set(key, result);
+  return result;
 }
 
 /**
@@ -152,11 +157,16 @@ export async function listTeachers(
   schoolId: string,
   pagination: Pagination,
 ): Promise<Paginated<TeacherPublic>> {
+  const key = `teachers:${schoolId}:${pagination.page}:${pagination.limit}`;
+  const cached = cache.get<Paginated<TeacherPublic>>(key);
+  if (cached) return cached;
   const [rows, total] = await Promise.all([
     Teacher.find({ schoolId }).sort({ name: 1 }).skip(pagination.skip).limit(pagination.limit),
     Teacher.countDocuments({ schoolId }),
   ]);
-  return paginate(rows.map(serializeTeacher), total, pagination.page, pagination.limit);
+  const result = paginate(rows.map(serializeTeacher), total, pagination.page, pagination.limit);
+  cache.set(key, result);
+  return result;
 }
 
 /**
@@ -202,6 +212,9 @@ export async function listAssessments(
   const filter: Record<string, unknown> = { schoolId };
   if (status !== 'all') filter.status = status;
 
+  const key = `assessments:${schoolId}:${status}:${pagination.page}:${pagination.limit}`;
+  const cached = cache.get<Paginated<AssessmentPublic>>(key);
+  if (cached) return cached;
   const [rows, total] = await Promise.all([
     Assessment.find(filter)
       .sort({ submittedAt: -1, createdAt: -1 })
@@ -209,7 +222,9 @@ export async function listAssessments(
       .limit(pagination.limit),
     Assessment.countDocuments(filter),
   ]);
-  return paginate(rows.map(serializeAssessment), total, pagination.page, pagination.limit);
+  const result = paginate(rows.map(serializeAssessment), total, pagination.page, pagination.limit);
+  cache.set(key, result);
+  return result;
 }
 
 /**

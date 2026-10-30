@@ -45,4 +45,6 @@ const teacherSchema = new Schema<ITeacherDocument>(
   },
 );
 
+teacherSchema.index({ schoolId: 1, name: 1 });
+
 export const Teacher = model<ITeacherDocument, Model<ITeacherDocument>>('Teacher', teacherSchema);
