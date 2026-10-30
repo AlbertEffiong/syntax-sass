@@ -139,14 +139,14 @@ export async function listStudents(
   if (currentClass) filter.currentClass = currentClass;
 
   const key = `students:${schoolId}:${currentClass ?? ''}:${pagination.page}:${pagination.limit}`;
-  const cached = cache.get<Paginated<StudentPublic>>(key);
+  const cached = await cache.get<Paginated<StudentPublic>>(key);
   if (cached) return cached;
   const [rows, total] = await Promise.all([
     Student.find(filter).sort({ fullName: 1 }).skip(pagination.skip).limit(pagination.limit),
     Student.countDocuments(filter),
   ]);
   const result = paginate(rows.map(serializeStudent), total, pagination.page, pagination.limit);
-  cache.set(key, result);
+  await cache.set(key, result);
   return result;
 }
 
@@ -158,14 +158,14 @@ export async function listTeachers(
   pagination: Pagination,
 ): Promise<Paginated<TeacherPublic>> {
   const key = `teachers:${schoolId}:${pagination.page}:${pagination.limit}`;
-  const cached = cache.get<Paginated<TeacherPublic>>(key);
+  const cached = await cache.get<Paginated<TeacherPublic>>(key);
   if (cached) return cached;
   const [rows, total] = await Promise.all([
     Teacher.find({ schoolId }).sort({ name: 1 }).skip(pagination.skip).limit(pagination.limit),
     Teacher.countDocuments({ schoolId }),
   ]);
   const result = paginate(rows.map(serializeTeacher), total, pagination.page, pagination.limit);
-  cache.set(key, result);
+  await cache.set(key, result);
   return result;
 }
 
@@ -213,7 +213,7 @@ export async function listAssessments(
   if (status !== 'all') filter.status = status;
 
   const key = `assessments:${schoolId}:${status}:${pagination.page}:${pagination.limit}`;
-  const cached = cache.get<Paginated<AssessmentPublic>>(key);
+  const cached = await cache.get<Paginated<AssessmentPublic>>(key);
   if (cached) return cached;
   const [rows, total] = await Promise.all([
     Assessment.find(filter)
@@ -223,7 +223,7 @@ export async function listAssessments(
     Assessment.countDocuments(filter),
   ]);
   const result = paginate(rows.map(serializeAssessment), total, pagination.page, pagination.limit);
-  cache.set(key, result);
+  await cache.set(key, result);
   return result;
 }
 

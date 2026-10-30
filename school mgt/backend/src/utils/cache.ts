@@ -1,20 +1,34 @@
-interface Entry<T> { value: T; expires: number; }
-export class TTLCache<T = unknown> {
-  private store = new Map<string, Entry<T>>();
-  constructor(private defaultTtlMs = 30_000) {}
-  get(key: string): T | undefined {
-    const e = this.store.get(key);
-    if (!e) return undefined;
-    if (e.expires < Date.now()) { this.store.delete(key); return undefined; }
-    return e.value;
-  }
-  set(key: string, value: T, ttlMs?: number): void {
-    this.store.set(key, { value, expires: Date.now() + (ttlMs ?? this.defaultTtlMs) });
-  }
-  delete(key: string): void { this.store.delete(key); }
-  invalidatePrefix(prefix: string): void {
-    for (const k of this.store.keys()) if (k.startsWith(prefix)) this.store.delete(k);
-  }
-  clear(): void { this.store.clear(); }
-}
-export const cache = new TTLCache(30_000);
+import Redis from 'ioredis';
+
+const redis = new Redis(process.env.REDIS_URL ?? 'redis://127.0.0.1:6379', {
+  lazyConnect: true,
+  maxRetriesPerRequest: 1,
+});
+redis.on('error', () => {});
+
+const memory = new Map<string, { value: string; expires: number }>();
+
+export const cache = {
+  async get<T>(key: string): Promise<T | undefined> {
+    try {
+      const v = await redis.get(key);
+      if (v !== null) return JSON.parse(v) as T;
+    } catch {}
+    const e = memory.get(key);
+    if (e && e.expires > Date.now()) return JSON.parse(e.value) as T;
+    memory.delete(key);
+    return undefined;
+  },
+  async set<T>(key: string, value: T, ttlMs = 30_000): Promise<void> {
+    const s = JSON.stringify(value);
+    try { await redis.set(key, s, 'PX', ttlMs); } catch {}
+    memory.set(key, { value: s, expires: Date.now() + ttlMs });
+  },
+  async invalidatePrefix(prefix: string): Promise<void> {
+    try {
+      const keys = await redis.keys(`${prefix}*`);
+      if (keys.length) await redis.del(...keys);
+    } catch {}
+    for (const k of memory.keys()) if (k.startsWith(prefix)) memory.delete(k);
+  },
+};
