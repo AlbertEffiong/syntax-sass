@@ -9,6 +9,7 @@ import { assertSameSchool } from '../utils/security';
 import { generateStudentId } from '../utils/studentId';
 import { hashPassword } from '../utils/password';
 import { paginate, Paginated, Pagination } from '../utils/pagination';
+import { cache } from '../utils/cache';
 import {
   ClassPublic,
   serializeClass,
