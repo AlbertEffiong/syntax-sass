@@ -81,14 +81,7 @@ const state = {
   },
   adminSection: "dashboard",
   teacherTab: "manual",
-  schools: [
-    { id: 1, code: "BFA", name: "Bright Future Academy", tag: "Excellence & Integrity", address: "12 Unity Road, Lagos, Nigeria", students: 348, status: "active", renewal: "2026-10-20", plan: 49, adminEmail: "admin@brightfuture.edu", password: "school123", principal: "A. Bello" },
-    { id: 2, code: "GVH", name: "Green Valley High", tag: "Knowledge & Service", address: "7 Valley Road, Abuja, Nigeria", students: 512, status: "active", renewal: "2026-10-14", plan: 49, adminEmail: "admin@greenvalley.edu", password: "school123", principal: "M. Okonkwo", pendingPayment: { reference: "OPAY/GVH/88213", amount: 49, receipt: "opay-receipt.png", submittedAt: "2026-10-08", status: "pending" } },
-    { id: 3, code: "RPC", name: "Royal Pride College", tag: "Pride in Excellence", address: "3 Crown Avenue, Ibadan, Nigeria", students: 221, status: "grace", renewal: "2026-10-02", plan: 49, adminEmail: "admin@royalpride.edu", password: "school123", principal: "S. Adewale" },
-    { id: 4, code: "SIS", name: "Sunrise International", tag: "Rising to Greatness", address: "21 Horizon Close, Port Harcourt, Nigeria", students: 640, status: "expired", renewal: "2026-09-18", plan: 99, adminEmail: "admin@sunrise.edu", password: "school123", principal: "E. Bassey" },
-    { id: 5, code: "UGS", name: "Unity Grammar School", tag: "Together We Grow", address: "9 Concord Way, Kano, Nigeria", students: 158, status: "active", renewal: "2026-11-01", plan: 49, adminEmail: "admin@unity.edu", password: "school123", principal: "H. Yakubu" },
-    { id: 6, code: "CMS", name: "Crescent Model School", tag: "Faith & Learning", address: "5 Crescent Lane, Kaduna, Nigeria", students: 403, status: "locked", renewal: "2026-09-01", plan: 49, adminEmail: "admin@crescent.edu", password: "school123", principal: "I. Salami" },
-  ],
+  schools: [],
   students: buildStudents(),
   teachers: buildTeachers(),
   classes: CLASS_LEVELS.map((name, i) => ({
