@@ -28,7 +28,7 @@ export function establishSession(res: Response, authUser: AuthUser): SessionToke
 
   res.cookie(env.cookies.authName, token, {
     httpOnly: true,
-    sameSite: 'strict',
+    sameSite: 'none',
     secure: env.cookies.secure,
     domain: env.cookies.domain,
     path: '/',
@@ -44,6 +44,6 @@ export function establishSession(res: Response, authUser: AuthUser): SessionToke
  */
 export function clearSession(res: Response): void {
   const base = { path: '/', domain: env.cookies.domain, secure: env.cookies.secure } as const;
-  res.clearCookie(env.cookies.authName, { ...base, httpOnly: true, sameSite: 'strict' });
-  res.clearCookie(env.cookies.csrfName, { ...base, httpOnly: false, sameSite: 'strict' });
+  res.clearCookie(env.cookies.authName, { ...base, httpOnly: true, sameSite: 'none' });
+  res.clearCookie(env.cookies.csrfName, { ...base, httpOnly: false, sameSite: 'none' });
 }
