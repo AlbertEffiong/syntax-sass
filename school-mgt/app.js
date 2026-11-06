@@ -534,7 +534,6 @@ function authGateway() {
       <div class="auth-panel">${authPanel(tab)}</div>
 
       <p style="text-align:center;color:var(--muted);font-size:12px;margin-top:18px">
-        Protected area · <a href="#" data-action="demo:reset" style="color:var(--indigo-700);font-weight:600">Reset demo</a>
       </p>
     </div>
   </div>`;
@@ -556,10 +555,9 @@ function authOwnerForm() {
       </div>
       <div class="field">
         <label for="ow-pass">Password</label>
-        <input class="input" id="ow-pass" name="password" type="password" placeholder="••••••••" value="master123" required />
+        <input class="input" id="ow-pass" name="password" type="password" placeholder="••••••••" placeholder="••••••••" required />
       </div>
       <button type="submit" class="btn btn-primary btn-block" style="padding:12px;margin-top:6px">${ic.shield}<span>Sign In to Platform Console</span></button>
-      <div class="demo-note"><strong>Demo:</strong> ${OWNER_EMAIL} / ${OWNER_PASSWORD}</div>
     </form>`;
 }
 
@@ -575,10 +573,6 @@ function authAdminForm() {
         <input class="input" id="ad-pass" name="password" type="password" placeholder="••••••••" value="school123" required />
       </div>
       <button type="submit" class="btn btn-primary btn-block" style="padding:12px;margin-top:6px">${ic.building}<span>Sign In to School Dashboard</span></button>
-      <div class="demo-note">
-        <strong>Demo:</strong> admin@brightfuture.edu / school123 (active) · admin@sunrise.edu / school123 (expired → lock screen).<br />
-        School accounts are provisioned by the platform owner.
-      </div>
     </form>`;
 }
 
@@ -594,7 +588,6 @@ function authTeacherForm() {
         <input class="input" id="tc-pass" name="password" type="password" placeholder="••••••••" value="teach123" required />
       </div>
       <button type="submit" class="btn btn-primary btn-block" style="padding:12px;margin-top:6px">${ic.userCheck}<span>Sign In to Teacher Portal</span></button>
-      <div class="demo-note">Only accounts verified by the school admin can sign in. <strong>Demo:</strong> teacher@brightfuture.edu / teach123</div>
     </form>`;
 }
 
@@ -623,7 +616,6 @@ function authStudentForm() {
         </div>
       </div>
       <button type="submit" class="btn btn-primary btn-block" style="padding:12px;margin-top:6px">${ic.search}<span>Check Result</span></button>
-      <div class="demo-note">Checking results for <strong>${esc(s.name)}</strong>. <strong>Demo:</strong> any enrolled Student ID with the school-issued password, or PIN ${DEFAULT_PIN}.</div>
     </form>`;
 }
 
@@ -2323,7 +2315,6 @@ function studentLogin() {
         </div>
         <button type="submit" class="btn btn-primary btn-block" style="padding:13px;margin-top:6px">${ic.search}<span>Check Result</span></button>
       </form>
-      <div class="demo-note"><strong>Demo:</strong> any enrolled Student ID works with <strong>${DEFAULT_PIN}</strong>, or use the parent password issued by the school${sample ? `<br />Sample: <strong>${esc(sample.id)}</strong> · ${esc(sample.name)} (${esc(sample.cls)})` : ""}.</div>
       <div style="text-align:center;margin-top:14px"><button class="btn btn-ghost btn-sm" data-action="auth:logout">${ic.logout}<span>Back to Login</span></button></div>
     </div>
   </div>`;
