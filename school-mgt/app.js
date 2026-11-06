@@ -80,6 +80,7 @@ const state = {
     student: { loggedIn: false, id: "", term: "First Term" },
   },
   adminSection: "dashboard",
+  ownerFilter: "all",
   teacherTab: "manual",
   schools: [],
   students: buildStudents(),
@@ -642,7 +643,8 @@ function superAdmin() {
       </div>
     </div>`).join("");
 
-  const rows = state.schools.map((s) => `
+  const filteredSchools = state.ownerFilter === "all" ? state.schools : state.schools.filter((s) => (state.ownerFilter === "active" ? (s.status === "active" || s.status === "grace") : (s.status === "expired" || s.status === "locked")));
+  const rows = filteredSchools.map((s) => `
     <tr>
       <td>
         <div class="avatar-cell">
@@ -725,9 +727,9 @@ function superAdmin() {
           <div class="hint">${state.schools.length} tenants · manage subscriptions and access</div>
         </div>
         <div class="segmented">
-          <button class="active">All</button>
-          <button data-action="noop">Active</button>
-          <button data-action="noop">Expired</button>
+          <button data-action="super:filter" data-value="all" class="${state.ownerFilter==='all'?'active':''}">All</button>
+          <button data-action="super:filter" data-value="active" class="${state.ownerFilter==='active'?'active':''}">Active</button>
+          <button data-action="super:filter" data-value="expired" class="${state.ownerFilter==='expired'?'active':''}">Expired</button>
         </div>
       </div>
       <div class="table-wrap">
@@ -2740,6 +2742,12 @@ document.addEventListener("click", (e) => {
       }
       break;
     }
+    case "super:filter": {
+      state.ownerFilter = btn.getAttribute("data-value") || "all";
+      render();
+      break;
+    }
+
     case "super:delete": {
       const school = state.schools.find((s) => s.id === id);
       if (!school) break;
