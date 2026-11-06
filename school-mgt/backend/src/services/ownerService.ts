@@ -108,7 +108,7 @@ export async function setSchoolStatus(
   school.subscriptionStatus = status;
   if (status === 'Active' && school.subscriptionExpiresAt.getTime() <= Date.now()) {
     // Re-activating an expired plan always grants a fresh 30-day window.
-    school.subscriptionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    school.subscriptionExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
   }
   await school.save();
   return serializeSchool(school);
