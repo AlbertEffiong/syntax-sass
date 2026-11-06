@@ -2712,6 +2712,7 @@ document.addEventListener("click", (e) => {
     case "super:extend": {
       const school = state.schools.find((s) => s.id === id);
       if (school) {
+        if (LIVE_API) { try { window.SyntaxApi.owner.setSchoolStatus(id, "Active"); } catch (e) {} }
         school.renewal = addDays(school.renewal, 30);
         if (school.status === "expired" || school.status === "grace" || school.status === "locked") school.status = "active";
         if (id === state.school.id) {
@@ -2726,6 +2727,8 @@ document.addEventListener("click", (e) => {
     case "super:lock": {
       const school = state.schools.find((s) => s.id === id);
       if (school) {
+        const next = school.status === "locked" ? "Active" : "Expired";
+        if (LIVE_API) { try { window.SyntaxApi.owner.setSchoolStatus(id, next); } catch (e) {} }
         school.status = school.status === "locked" ? "active" : "locked";
         if (id === state.school.id) state.school.status = school.status;
         toast(school.status === "locked" ? "School locked" : "School unlocked", school.name, school.status === "locked" ? "error" : "success");
