@@ -3592,6 +3592,12 @@ async function liveRestore() {
     if (!u || !u.role) return;
     if (u.role === "owner") {
       state.auth.tier = "owner";
+      try {
+        const res = await window.SyntaxApi.owner.listSchools({ page: 1, limit: 100 });
+        const items = (res && res.data && res.data.items) || (res && res.items) || [];
+        state.schools = [];
+        items.forEach((x) => liveUpsertSchool(x));
+      } catch (e) {}
     } else if (u.role === "admin") {
       const school = liveUpsertSchool(await SyntaxApi.admin.getSchool());
       state.school = school;
