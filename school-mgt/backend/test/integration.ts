@@ -102,6 +102,7 @@ async function main(): Promise<void> {
   const { connectDatabase, disconnectDatabase } = await import('../src/config/db');
   const { createApp } = await import('../src/app');
   const { Owner } = await import('../src/models/Owner');
+  const { ClassModel } = await import('../src/models/Class');
   const { hashPassword } = await import('../src/utils/password');
 
   await connectDatabase();
@@ -158,6 +159,11 @@ async function main(): Promise<void> {
       principalName: 'Mr. Ben Eze',
     });
     check('register school B 201', schoolB.status === 201, schoolB.json);
+    await ClassModel.create({
+      schoolId: schoolB.json.data.id,
+      className: 'GVH Test Class',
+      subjects: ['English'],
+    });
 
     const dashboard = await owner.get('/api/owner/dashboard');
     check('owner dashboard 200 + MRR', dashboard.status === 200 && dashboard.json?.data?.activeSchools === 2 && dashboard.json?.data?.mrr === 98, dashboard.json);
@@ -339,6 +345,15 @@ async function main(): Promise<void> {
     });
     check('owner verifies payment reactivates 200', verifyPay.status === 200 && verifyPay.json?.data?.subscriptionStatus === 'Active', verifyPay.json);
 
+    const expiryBeforeExtend = new Date(verifyPay.json.data.subscriptionExpiresAt).getTime();
+    const extended = await owner.post(`/api/owner/schools/${schoolA.json.data.id}/extend`);
+    const expiryAfterExtend = new Date(extended.json?.data?.subscriptionExpiresAt).getTime();
+    check(
+      'owner extends subscription by 30 days',
+      extended.status === 200 && expiryAfterExtend - expiryBeforeExtend >= 29 * 24 * 60 * 60 * 1000,
+      extended.json,
+    );
+
     const unlockedResults = await studentClient.get('/api/student/results');
     check('results available again after reactivation', unlockedResults.status === 200, unlockedResults.json);
 
@@ -385,6 +400,13 @@ async function main(): Promise<void> {
 
     const wrongRole = await adminA.get('/api/owner/dashboard');
     check('admin cannot access owner route (403)', wrongRole.status === 403, wrongRole.json);
+
+    const deletedSchool = await owner.request('DELETE', `/api/owner/schools/${schoolB.json.data.id}`, undefined, true);
+    check('owner deletes school 200', deletedSchool.status === 200 && deletedSchool.json?.data?.id === schoolB.json.data.id, deletedSchool.json);
+    check(
+      'deleting school removes tenant classes',
+      await ClassModel.countDocuments({ schoolId: schoolB.json.data.id }) === 0,
+    );
 
     // -------------------------------------------------- rate limiting (last)
     const brute = new Client();

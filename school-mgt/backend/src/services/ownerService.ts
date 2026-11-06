@@ -1,5 +1,8 @@
 import { School, isSubscriptionActive } from '../models/School';
 import { Student } from '../models/Student';
+import { Teacher } from '../models/Teacher';
+import { ClassModel } from '../models/Class';
+import { Assessment } from '../models/Assessment';
 import { ApiError } from '../utils/ApiError';
 import { serializeSchool, SchoolPublic } from '../utils/serialize';
 import { paginate, Paginated, Pagination } from '../utils/pagination';
@@ -112,6 +115,38 @@ export async function setSchoolStatus(
   }
   await school.save();
   return serializeSchool(school);
+}
+
+/** Extend a school's subscription by 30 days, starting from its current expiry. */
+export async function extendSubscription(schoolId: string): Promise<SchoolPublic> {
+  const school = await School.findById(schoolId);
+  if (!school) {
+    throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');
+  }
+
+  const base = Math.max(Date.now(), school.subscriptionExpiresAt.getTime());
+  school.subscriptionStatus = 'Active';
+  school.subscriptionExpiresAt = new Date(base + 30 * 24 * 60 * 60 * 1000);
+  await school.save();
+  return serializeSchool(school);
+}
+
+/** Remove a school and its tenant-owned records. */
+export async function deleteSchool(schoolId: string): Promise<{ id: string }> {
+  const school = await School.findById(schoolId);
+  if (!school) {
+    throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');
+  }
+
+  const tenantId = school._id;
+  await Promise.all([
+    Assessment.deleteMany({ schoolId: tenantId }),
+    ClassModel.deleteMany({ schoolId: tenantId }),
+    Student.deleteMany({ schoolId: tenantId }),
+    Teacher.deleteMany({ schoolId: tenantId }),
+  ]);
+  await school.deleteOne();
+  return { id: String(tenantId) };
 }
 
 /**

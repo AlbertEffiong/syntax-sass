@@ -664,7 +664,7 @@ function superAdmin() {
       <td>
         <div class="row-actions">
           <button class="btn btn-soft btn-sm" data-action="super:extend" data-id="${s.id}" title="Extend subscription">${ic.clock}<span>Extend</span></button>
-          <button class="btn btn-amber btn-sm" data-action="super:lock" data-id="${s.id}" title="${s.status === "locked" ? "Unlock school" : "Lock school"}">${s.status === "locked" ? ic.unlock : ic.lock}<span>${s.status === "locked" ? "Unlock" : "Lock"}</span></button>
+          <button class="btn btn-amber btn-sm" data-action="super:lock" data-id="${s.id}" title="${s.status === "locked" || s.status === "expired" ? "Unlock school" : "Lock school"}">${s.status === "locked" || s.status === "expired" ? ic.unlock : ic.lock}<span>${s.status === "locked" || s.status === "expired" ? "Unlock" : "Lock"}</span></button>
           <button class="icon-btn danger" data-action="super:delete" data-id="${s.id}" title="Delete school">${ic.trash}</button>
         </div>
       </td>
@@ -2716,29 +2716,43 @@ document.addEventListener("click", (e) => {
       break;
     }
     case "super:extend": {
-      const school = state.schools.find((s) => s.id === id);
+      const school = state.schools.find((s) => String(s.id) === String(rawId));
       if (school) {
-        if (LIVE_API) { try { window.SyntaxApi.owner.setSchoolStatus(id, "Active"); } catch (e) {} }
-        school.renewal = addDays(school.renewal, 30);
-        if (school.status === "expired" || school.status === "grace" || school.status === "locked") school.status = "active";
-        if (id === state.school.id) {
-          state.school.renewal = school.renewal;
-          state.school.status = "active";
+        if (LIVE_API) {
+          window.SyntaxApi.owner.extendSubscription(rawId).then((updated) => {
+            liveUpsertSchool(updated);
+            const refreshed = state.schools.find((s) => String(s.id) === String(rawId));
+            toast("Subscription extended", `${school.name} renewed to ${fmtDate(refreshed.renewal)}.`);
+            render();
+          }).catch((err) => toast("Extension failed", err.message || "Could not extend this subscription.", "error"));
+        } else {
+          school.renewal = addDays(school.renewal, 30);
+          if (school.status === "expired" || school.status === "grace" || school.status === "locked") school.status = "active";
+          toast("Subscription extended", `${school.name} renewed to ${fmtDate(school.renewal)}.`);
+          render();
         }
-        toast("Subscription extended", `${school.name} renewed to ${fmtDate(school.renewal)}.`);
-        render();
       }
       break;
     }
     case "super:lock": {
-      const school = state.schools.find((s) => s.id === id);
+      const school = state.schools.find((s) => String(s.id) === String(rawId));
       if (school) {
-        const next = school.status === "locked" ? "Active" : "Expired";
-        if (LIVE_API) { try { window.SyntaxApi.owner.setSchoolStatus(id, next); } catch (e) {} }
-        school.status = school.status === "locked" ? "active" : "locked";
-        if (id === state.school.id) state.school.status = school.status;
-        toast(school.status === "locked" ? "School locked" : "School unlocked", school.name, school.status === "locked" ? "error" : "success");
-        render();
+        const currentlyLocked = school.status === "locked" || school.status === "expired";
+        const next = currentlyLocked ? "Active" : "Expired";
+        const applyStatus = (updated) => {
+          if (LIVE_API) liveUpsertSchool(updated);
+          else school.status = currentlyLocked ? "active" : "locked";
+          const current = state.schools.find((s) => String(s.id) === String(rawId));
+          const isLocked = current.status === "locked" || current.status === "expired";
+          toast(isLocked ? "School locked" : "School unlocked", school.name, isLocked ? "error" : "success");
+          render();
+        };
+        if (LIVE_API) {
+          window.SyntaxApi.owner.setSchoolStatus(rawId, next).then(applyStatus)
+            .catch((err) => toast("Update failed", err.message || "Could not change this school's access.", "error"));
+        } else {
+          applyStatus();
+        }
       }
       break;
     }
@@ -2749,7 +2763,7 @@ document.addEventListener("click", (e) => {
     }
 
     case "super:delete": {
-      const school = state.schools.find((s) => s.id === id);
+      const school = state.schools.find((s) => String(s.id) === String(rawId));
       if (!school) break;
       openModal(`
         <div class="modal-head">
@@ -2761,16 +2775,25 @@ document.addEventListener("click", (e) => {
         </div>
         <div class="modal-foot">
           <button class="btn btn-ghost" data-action="modal:close">Cancel</button>
-          <button class="btn btn-red" data-action="super:confirmDelete" data-id="${id}">${ic.trash}<span>Delete Permanently</span></button>
+          <button class="btn btn-red" data-action="super:confirmDelete" data-id="${rawId}">${ic.trash}<span>Delete Permanently</span></button>
         </div>`);
       break;
     }
     case "super:confirmDelete": {
-      const school = state.schools.find((s) => s.id === id);
-      state.schools = state.schools.filter((s) => s.id !== id);
-      closeModal();
-      toast("School deleted", school ? school.name + " removed." : "", "error");
-      render();
+      const school = state.schools.find((s) => String(s.id) === String(rawId));
+      if (!school) break;
+      const finishDelete = () => {
+        state.schools = state.schools.filter((s) => String(s.id) !== String(rawId));
+        closeModal();
+        toast("School deleted", school.name + " removed.", "error");
+        render();
+      };
+      if (LIVE_API) {
+        window.SyntaxApi.owner.removeSchool(rawId).then(finishDelete)
+          .catch((err) => toast("Delete failed", err.message || "Could not delete this school.", "error"));
+      } else {
+        finishDelete();
+      }
       break;
     }
 

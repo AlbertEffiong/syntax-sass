@@ -41,6 +41,28 @@ router.patch(
 );
 
 /**
+ * @route  POST /api/owner/schools/:id/extend
+ * @desc   Extend a school's subscription by 30 days.
+ * @access Owner
+ */
+router.post(
+  '/schools/:id/extend',
+  validate(setSchoolStatusParamsSchema, 'params'),
+  ownerController.extendSubscription,
+);
+
+/**
+ * @route  DELETE /api/owner/schools/:id
+ * @desc   Delete a school and all of its tenant data.
+ * @access Owner
+ */
+router.delete(
+  '/schools/:id',
+  validate(setSchoolStatusParamsSchema, 'params'),
+  ownerController.deleteSchool,
+);
+
+/**
  * @route  POST /api/owner/verify-payment
  * @desc   Confirm a manual OPay bank transfer and reactivate a school.
  * @access Owner

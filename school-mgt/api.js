@@ -190,6 +190,12 @@
     setSchoolStatus: function (id, status) {
       return patch('/api/owner/schools/' + encodeURIComponent(id) + '/status', { status: status });
     },
+    extendSubscription: function (id) {
+      return post('/api/owner/schools/' + encodeURIComponent(id) + '/extend');
+    },
+    removeSchool: function (id) {
+      return del('/api/owner/schools/' + encodeURIComponent(id));
+    },
     verifyPayment: function (payload) {
       return post('/api/owner/verify-payment', payload);
     },

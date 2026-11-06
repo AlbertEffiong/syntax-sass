@@ -35,6 +35,22 @@ export const setSchoolStatus = asyncHandler(async (req: Request, res: Response) 
 });
 
 /**
+ * POST /api/owner/schools/:id/extend
+ */
+export const extendSubscription = asyncHandler(async (req: Request, res: Response) => {
+  const school = await ownerService.extendSubscription(req.params.id);
+  return ok(res, school, 'School subscription extended for 30 days.');
+});
+
+/**
+ * DELETE /api/owner/schools/:id
+ */
+export const deleteSchool = asyncHandler(async (req: Request, res: Response) => {
+  const result = await ownerService.deleteSchool(req.params.id);
+  return ok(res, result, 'School and tenant data deleted.');
+});
+
+/**
  * POST /api/owner/verify-payment
  */
 export const verifyPayment = asyncHandler(async (req: Request, res: Response) => {
