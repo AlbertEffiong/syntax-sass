@@ -48,7 +48,7 @@ const ic = {
 /* ----------------------------- Auth constants ----------------------------- */
 const OWNER_EMAIL = "owner@syntaxsaas.io";
 const OWNER_PASSWORD = "master123";
-const DEFAULT_ADMIN_PASSWORD = "school123";
+const DEFAULT_ADMIN_PASSWORD = "School123!";
 const DEFAULT_TEACHER_PASSWORD = "teach123";
 const DEFAULT_PIN = "1234";
 
