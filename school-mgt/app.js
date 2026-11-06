@@ -570,7 +570,7 @@ function authAdminForm() {
       </div>
       <div class="field">
         <label for="ad-pass">Password</label>
-        <input class="input" id="ad-pass" name="password" type="password" placeholder="••••••••" value="school123" required />
+        <input class="input" id="ad-pass" name="password" type="password" placeholder="••••••••" placeholder="••••••••" required />
       </div>
       <button type="submit" class="btn btn-primary btn-block" style="padding:12px;margin-top:6px">${ic.building}<span>Sign In to School Dashboard</span></button>
     </form>`;
@@ -585,7 +585,7 @@ function authTeacherForm() {
       </div>
       <div class="field">
         <label for="tc-pass">Password</label>
-        <input class="input" id="tc-pass" name="password" type="password" placeholder="••••••••" value="teach123" required />
+        <input class="input" id="tc-pass" name="password" type="password" placeholder="••••••••" placeholder="••••••••" required />
       </div>
       <button type="submit" class="btn btn-primary btn-block" style="padding:12px;margin-top:6px">${ic.userCheck}<span>Sign In to Teacher Portal</span></button>
     </form>`;
@@ -604,7 +604,7 @@ function authStudentForm() {
         </div>
         <div class="field">
           <label for="s-pin">Password</label>
-          <input class="input" id="s-pin" name="pin" type="password" placeholder="••••••" value="1234" required />
+          <input class="input" id="s-pin" name="pin" type="password" placeholder="••••••" placeholder="••••" required />
         </div>
         <div class="field">
           <label for="s-term">Select Term</label>
