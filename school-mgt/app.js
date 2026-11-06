@@ -770,6 +770,10 @@ function newSchoolModal() {
           <input class="input" id="ns-email" name="adminEmail" type="email" placeholder="admin@school.edu" required />
           <span class="hint">This email becomes the school's login ID on the School Admin portal.</span>
         </div>
+        <div class="field">
+          <label for="ns-prefix">School Prefix (2-6 letters)</label>
+          <input class="input" id="ns-prefix" name="uniqueSchoolPrefix" placeholder="e.g. BFA" required />
+        </div>
         <div class="input-group">
           <div class="field">
             <label for="ns-students">Student Count</label>
@@ -3097,7 +3101,7 @@ document.addEventListener("mousedown", (e) => {
 });
 
 /* Form submits */
-document.addEventListener("submit", (e) => {
+document.addEventListener("submit", async (e) => {
   const form = e.target.closest("[data-action]");
   if (!form) return;
   const action = form.getAttribute("data-action");
@@ -3108,6 +3112,22 @@ document.addEventListener("submit", (e) => {
     const adminEmail = String(data.get("adminEmail") || "").trim().toLowerCase();
     if (state.schools.some((s) => (s.adminEmail || "").toLowerCase() === adminEmail)) {
       toast("Email already in use", "Another school is already registered with that admin email.", "error");
+      return;
+    }
+    if (LIVE_API) {
+      try {
+        const res = await window.SyntaxApi.auth.registerSchool({
+          name: String(data.get("name") || "").trim(),
+          email: adminEmail,
+          password: DEFAULT_ADMIN_PASSWORD,
+          uniqueSchoolPrefix: String(data.get("uniqueSchoolPrefix") || "").trim().toUpperCase(),
+          planMonthly: Number(data.get("plan")) || 49,
+        });
+        if (res && res.user) liveUpsertSchool(res.user);
+        closeModal();
+        toast("School registered", `${String(data.get("name"))} created.`);
+        render();
+      } catch (e) { toast("Error", e.message || "Failed", "error"); }
       return;
     }
     const school = {
