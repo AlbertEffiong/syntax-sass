@@ -551,7 +551,7 @@ function authOwnerForm() {
     <form data-action="form:ownerlogin">
       <div class="field">
         <label for="ow-email">Master Admin Email</label>
-        <input class="input" id="ow-email" name="email" type="email" placeholder="owner@syntaxsaas.io" value="owner@syntaxsaas.io" required />
+        <input class="input" id="ow-email" name="email" type="email" placeholder="owner@syntaxsaas.io"  required />
       </div>
       <div class="field">
         <label for="ow-pass">Password</label>
@@ -566,7 +566,7 @@ function authAdminForm() {
     <form data-action="form:adminlogin">
       <div class="field">
         <label for="ad-email">School Admin Email</label>
-        <input class="input" id="ad-email" name="email" type="email" placeholder="admin@your-school.edu" value="admin@brightfuture.edu" required />
+        <input class="input" id="ad-email" name="email" type="email" placeholder="admin@your-school.edu"  required />
       </div>
       <div class="field">
         <label for="ad-pass">Password</label>
