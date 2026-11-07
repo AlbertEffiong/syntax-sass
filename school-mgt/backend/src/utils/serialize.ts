@@ -57,6 +57,8 @@ export interface TeacherPublic {
   name: string;
   email: string;
   subject?: string;
+  classesTaught: number;
+  status: 'Active' | 'On Leave';
   verified: boolean;
 }
 
@@ -67,6 +69,8 @@ export function serializeTeacher(teacher: ITeacherDocument): TeacherPublic {
     name: teacher.name,
     email: teacher.email,
     subject: teacher.subject,
+    classesTaught: teacher.classesTaught,
+    status: teacher.status,
     verified: teacher.verified,
   };
 }

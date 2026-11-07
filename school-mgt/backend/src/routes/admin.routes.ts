@@ -48,6 +48,7 @@ router.patch(
   adminController.updateTeacher,
 );
 router.delete('/teachers/:id', validate(idParamsSchema, 'params'), adminController.removeTeacher);
+router.post('/teachers/:id/resend-otp', validate(idParamsSchema, 'params'), adminController.resendTeacherOtp);
 
 // --- Assessment approval workflow ---
 router.get(

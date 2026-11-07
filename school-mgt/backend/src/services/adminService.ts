@@ -32,6 +32,7 @@ export interface CreateClassInput {
 
 export interface EnrollStudentInput {
   schoolId: string;
+  classId?: string;
   fullName: string;
   gender: 'Male' | 'Female';
   dob: Date;
@@ -118,10 +119,12 @@ export async function enrollStudent(input: EnrollStudentInput): Promise<StudentP
     throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');
   }
 
-  const cls = await ClassModel.findOne({
-    schoolId: input.schoolId,
-    className: input.currentClass.trim(),
-  });
+  const cls = input.classId
+    ? await ClassModel.findOne({ _id: input.classId, schoolId: input.schoolId })
+    : await ClassModel.findOne({
+      schoolId: input.schoolId,
+      className: input.currentClass.trim(),
+    });
   if (!cls) {
     throw ApiError.badRequest(
       'The selected class is not part of this school\'s curriculum.',
@@ -210,22 +213,29 @@ export async function recordFeePayment(
 }
 
 export async function getDashboard(schoolId: string) {
-  const [summary] = await Student.aggregate([
-    { $match: { schoolId: new Types.ObjectId(schoolId) } },
-    {
-      $group: {
-        _id: null,
-        studentCount: { $sum: 1 },
-        feeExpected: { $sum: '$feeExpected' },
-        feeCollected: { $sum: '$feeCollected' },
-        feePending: { $sum: '$feeDue' },
-        debtorCount: { $sum: { $cond: [{ $gt: ['$feeDue', 0] }, 1, 0] } },
+  const tenantId = new Types.ObjectId(schoolId);
+  const [[summary], teacherCount, pendingAssessmentCount] = await Promise.all([
+    Student.aggregate([
+      { $match: { schoolId: tenantId } },
+      {
+        $group: {
+          _id: null,
+          studentCount: { $sum: 1 },
+          feeExpected: { $sum: '$feeExpected' },
+          feeCollected: { $sum: '$feeCollected' },
+          feePending: { $sum: '$feeDue' },
+          debtorCount: { $sum: { $cond: [{ $gt: ['$feeDue', 0] }, 1, 0] } },
+        },
       },
-    },
+    ]),
+    Teacher.countDocuments({ schoolId: tenantId }),
+    Assessment.countDocuments({ schoolId: tenantId, status: 'Pending Approval' }),
   ]);
 
   return {
     studentCount: summary?.studentCount ?? 0,
+    teacherCount,
+    pendingAssessmentCount,
     debtorCount: summary?.debtorCount ?? 0,
     fees: {
       expected: summary?.feeExpected ?? 0,
@@ -291,7 +301,7 @@ export async function listTeachers(
 export async function updateTeacher(
   schoolId: string,
   teacherId: string,
-  patch: { name?: string; subject?: string },
+  patch: { name?: string; subject?: string; classesTaught?: number; status?: 'Active' | 'On Leave' },
 ): Promise<TeacherPublic> {
   const teacher = await Teacher.findById(teacherId);
   if (!teacher) {
@@ -301,7 +311,10 @@ export async function updateTeacher(
 
   if (patch.name !== undefined) teacher.name = patch.name;
   if (patch.subject !== undefined) teacher.subject = patch.subject;
+  if (patch.classesTaught !== undefined) teacher.classesTaught = patch.classesTaught;
+  if (patch.status !== undefined) teacher.status = patch.status;
   await teacher.save();
+  await cache.invalidatePrefix(`teachers:${schoolId}:`);
   return serializeTeacher(teacher);
 }
 
@@ -315,6 +328,7 @@ export async function removeTeacher(schoolId: string, teacherId: string): Promis
   }
   assertSameSchool(teacher.schoolId, schoolId);
   await teacher.deleteOne();
+  await cache.invalidatePrefix(`teachers:${schoolId}:`);
 }
 
 /**

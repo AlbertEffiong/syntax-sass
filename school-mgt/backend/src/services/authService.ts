@@ -5,9 +5,11 @@ import { School } from '../models/School';
 import { Teacher, ITeacherDocument } from '../models/Teacher';
 import { Student, IStudentDocument } from '../models/Student';
 import { ApiError } from '../utils/ApiError';
+import { assertSameSchool } from '../utils/security';
 import { hashPassword, verifyPassword, isStrongPassword, PASSWORD_POLICY_MESSAGE } from '../utils/password';
 import { generateOtp, verifyOtp } from '../utils/otp';
 import { sendTeacherOtpEmail } from '../utils/mailer';
+import { cache } from '../utils/cache';
 import { env } from '../config/env';
 import {
   OwnerPublic,
@@ -48,6 +50,8 @@ export interface InviteTeacherInput {
   name: string;
   email: string;
   subject?: string;
+  classesTaught?: number;
+  status?: 'Active' | 'On Leave';
 }
 
 export interface InviteTeacherResult {
@@ -242,6 +246,8 @@ export async function inviteTeacher(input: InviteTeacherInput): Promise<InviteTe
     name: input.name,
     email,
     subject: input.subject,
+    classesTaught: input.classesTaught ?? 1,
+    status: input.status ?? 'Active',
     verified: false,
     otpHash: hash,
     otpExpiresAt: expiresAt,
@@ -249,11 +255,28 @@ export async function inviteTeacher(input: InviteTeacherInput): Promise<InviteTe
 
   const school = await School.findById(input.schoolId);
   await sendTeacherOtpEmail(email, code, school?.name ?? 'your school');
+  await cache.invalidatePrefix(`teachers:${input.schoolId}:`);
 
   // Outside production the OTP is also returned so it can be tested manually.
   const result: InviteTeacherResult = { teacher: serializeTeacher(teacher) };
   if (!env.isProduction) result.otp = code;
   return result;
+}
+
+export async function resendTeacherOtp(schoolId: string, teacherId: string): Promise<{ teacher: TeacherPublic; otp?: string }> {
+  const teacher = await Teacher.findById(teacherId);
+  if (!teacher) throw ApiError.notFound('Teacher not found.', 'TEACHER_NOT_FOUND');
+  assertSameSchool(teacher.schoolId, schoolId);
+  if (teacher.verified) throw ApiError.conflict('This teacher account is already activated.', 'ALREADY_VERIFIED');
+
+  const { code, hash, expiresAt } = await generateOtp();
+  teacher.otpHash = hash;
+  teacher.otpExpiresAt = expiresAt;
+  await teacher.save();
+  await cache.invalidatePrefix(`teachers:${schoolId}:`);
+  const school = await School.findById(schoolId);
+  await sendTeacherOtpEmail(teacher.email, code, school?.name ?? 'your school');
+  return { teacher: serializeTeacher(teacher), ...(!env.isProduction ? { otp: code } : {}) };
 }
 
 /**
@@ -281,6 +304,7 @@ export async function activateTeacherWithOtp(input: VerifyOtpInput): Promise<Tea
   teacher.otpHash = undefined;
   teacher.otpExpiresAt = undefined;
   await teacher.save();
+  await cache.invalidatePrefix(`teachers:${teacher.schoolId}:`);
 
   return serializeTeacher(teacher);
 }

@@ -4,6 +4,7 @@ import { created, ok } from '../utils/response';
 import { ApiError } from '../utils/ApiError';
 import { resolvePagination } from '../utils/pagination';
 import * as adminService from '../services/adminService';
+import * as authService from '../services/authService';
 import {
   CreateClassBody,
   EnrollStudentBody,
@@ -109,6 +110,11 @@ export const updateTeacher = asyncHandler(async (req: Request, res: Response) =>
 export const removeTeacher = asyncHandler(async (req: Request, res: Response) => {
   await adminService.removeTeacher(requireTenant(req), req.params.id);
   return ok(res, null, 'Teacher removed.');
+});
+
+export const resendTeacherOtp = asyncHandler(async (req: Request, res: Response) => {
+  const result = await authService.resendTeacherOtp(requireTenant(req), req.params.id);
+  return ok(res, result, 'A new verification code has been sent.');
 });
 
 /**

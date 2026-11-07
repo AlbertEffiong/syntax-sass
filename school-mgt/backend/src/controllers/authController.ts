@@ -39,6 +39,8 @@ export const inviteTeacher = asyncHandler(async (req: Request, res: Response) =>
     name: body.name,
     email: body.email,
     subject: body.subject,
+    classesTaught: body.classesTaught,
+    status: body.status,
   });
   return created(res, result, 'Teacher invited. An OTP has been sent for verification.');
 });

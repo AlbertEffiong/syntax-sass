@@ -25,5 +25,9 @@ export const submitBroadsheetSchema = broadsheetKeySchema.extend({
 
 export const broadsheetQuerySchema = broadsheetKeySchema;
 
+export const rosterQuerySchema = z.object({
+  classId: objectIdSchema,
+});
+
 export type SaveBroadsheetBody = z.infer<typeof saveBroadsheetSchema>;
 export type SubmitBroadsheetBody = z.infer<typeof submitBroadsheetSchema>;

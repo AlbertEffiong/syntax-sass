@@ -195,6 +195,7 @@ async function main(): Promise<void> {
       fullName: 'Tunde Bakare',
       gender: 'Male',
       dob: '2012-03-14',
+      classId: classAId,
       currentClass: 'JSS 1A',
       password: 'Pupil@12345',
       guardian: 'Mrs. Bakare',
@@ -239,7 +240,9 @@ async function main(): Promise<void> {
     check(
       'school dashboard aggregates expected collected and pending fees',
       feeDashboard.status === 200 && feeDashboard.json?.data?.fees?.expected === 1000 &&
-        feeDashboard.json?.data?.fees?.collected === 400 && feeDashboard.json?.data?.fees?.pending === 600,
+        feeDashboard.json?.data?.fees?.collected === 400 && feeDashboard.json?.data?.fees?.pending === 600 &&
+        feeDashboard.json?.data?.studentCount === 2 && feeDashboard.json?.data?.teacherCount === 0 &&
+        feeDashboard.json?.data?.pendingAssessmentCount === 0,
       feeDashboard.json,
     );
 
@@ -257,9 +260,12 @@ async function main(): Promise<void> {
       name: 'Mr. Segun Obi',
       email: 'teacher@brightfuture.edu',
       subject: 'Mathematics',
+      classesTaught: 4,
     });
-    check('invite teacher 201 + otp', invite.status === 201 && typeof invite.json?.data?.otp === 'string', invite.json);
-    const otp = invite.json?.data?.otp;
+    check('invite teacher persists class count and returns test otp', invite.status === 201 && typeof invite.json?.data?.otp === 'string' && invite.json?.data?.teacher?.classesTaught === 4, invite.json);
+    const resentOtp = await adminA.post(`/api/admin/teachers/${invite.json.data.teacher.id}/resend-otp`);
+    check('admin resends teacher OTP', resentOtp.status === 200 && typeof resentOtp.json?.data?.otp === 'string', resentOtp.json);
+    const otp = resentOtp.json?.data?.otp;
 
     const verify = new Client();
     const verified = await verify.post('/api/auth/verify-otp', {
@@ -279,6 +285,9 @@ async function main(): Promise<void> {
 
     const cs = await teacherA.get('/api/teacher/classes-subjects');
     check('teacher curriculum strictly synced', cs.status === 200 && cs.json?.data?.length === 1 && cs.json?.data?.[0]?.subjects?.length === 2, cs.json);
+    const teacherContext = await teacherA.get('/api/teacher/context');
+    const roster = await teacherA.get(`/api/teacher/roster?classId=${classAId}`);
+    check('teacher context and class roster are school scoped', teacherContext.status === 200 && teacherContext.json?.data?.id === schoolA.json.data.id && roster.status === 200 && roster.json?.data?.length === 2, { context: teacherContext.json, roster: roster.json });
 
     const saveBadSubject = await teacherA.post('/api/teacher/broadsheet/save', {
       classId: classAId,
@@ -314,6 +323,13 @@ async function main(): Promise<void> {
     // ---------------------------------------------------------------- approval
     const pending = await adminA.get('/api/admin/pending-assessments');
     check('admin sees 2 pending', pending.status === 200 && pending.json?.data?.items?.length === 2, pending.json);
+    const populatedDashboard = await adminA.get('/api/admin/dashboard');
+    check(
+      'dashboard counts teachers and pending approvals from backend',
+      populatedDashboard.status === 200 && populatedDashboard.json?.data?.teacherCount === 1 &&
+        populatedDashboard.json?.data?.pendingAssessmentCount === 2,
+      populatedDashboard.json,
+    );
 
     const toApprove = pending.json.data.items.find((a: any) => a.studentId === studentA1.json.data.studentId);
     const approve = await adminA.post('/api/admin/pending-assessments', {
@@ -431,10 +447,14 @@ async function main(): Promise<void> {
 
     const teacherId = invite.json.data.teacher.id;
     const teachers = await adminA.get('/api/admin/teachers');
-    check('admin lists teachers (paginated)', teachers.status === 200 && teachers.json?.data?.items?.length === 1, teachers.json);
+    check('admin lists teachers (paginated)', teachers.status === 200 && teachers.json?.data?.items?.length === 1 && teachers.json?.data?.items?.[0]?.classesTaught === 4, teachers.json);
 
-    const patched = await adminA.patch(`/api/admin/teachers/${teacherId}`, { subject: 'Further Mathematics' });
-    check('admin updates teacher 200', patched.status === 200 && patched.json?.data?.subject === 'Further Mathematics', patched.json);
+    const patched = await adminA.patch(`/api/admin/teachers/${teacherId}`, {
+      subject: 'Further Mathematics',
+      classesTaught: 5,
+      status: 'On Leave',
+    });
+    check('admin updates teacher profile 200', patched.status === 200 && patched.json?.data?.subject === 'Further Mathematics' && patched.json?.data?.classesTaught === 5 && patched.json?.data?.status === 'On Leave', patched.json);
 
     const schoolSelf = await adminA.get('/api/admin/school');
     check('admin reads own school settings', schoolSelf.status === 200 && schoolSelf.json?.data?.uniqueSchoolPrefix === 'BFA', schoolSelf.json);

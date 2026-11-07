@@ -5,7 +5,7 @@ import { Student } from '../models/Student';
 import { Assessment } from '../models/Assessment';
 import { ApiError } from '../utils/ApiError';
 import { computeTotal, gradeFor } from '../utils/grading';
-import { serializeClass, ClassPublic, serializeAssessment, AssessmentPublic } from '../utils/serialize';
+import { serializeClass, ClassPublic, serializeAssessment, AssessmentPublic, serializeSchool } from '../utils/serialize';
 
 export interface ScoreEntry {
   studentId: string;
@@ -43,6 +43,26 @@ export interface SubmitBroadsheetInput {
 export async function getClassesSubjects(schoolId: string): Promise<ClassPublic[]> {
   const classes = await ClassModel.find({ schoolId }).sort({ className: 1 });
   return classes.map(serializeClass);
+}
+
+export async function getTeacherContext(schoolId: string) {
+  const school = await School.findById(schoolId);
+  if (!school) throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');
+  return serializeSchool(school);
+}
+
+export async function getClassRoster(schoolId: string, classId: string) {
+  const cls = await ClassModel.findById(classId);
+  if (!cls) throw ApiError.notFound('Class not found.', 'CLASS_NOT_FOUND');
+  if (String(cls.schoolId) !== String(schoolId)) {
+    throw ApiError.forbidden('This class does not belong to your school.', 'IDOR_BLOCKED');
+  }
+  const students = await Student.find({ schoolId, currentClass: cls.className }).sort({ fullName: 1 });
+  return students.map((student) => ({
+    studentId: student.studentId,
+    fullName: student.fullName,
+    currentClass: student.currentClass,
+  }));
 }
 
 /**

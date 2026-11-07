@@ -14,6 +14,15 @@ export const getClassesSubjects = asyncHandler(async (req: Request, res: Respons
   return ok(res, classes);
 });
 
+export const getContext = asyncHandler(async (req: Request, res: Response) => {
+  return ok(res, await teacherService.getTeacherContext(requireTenant(req)));
+});
+
+export const getClassRoster = asyncHandler(async (req: Request, res: Response) => {
+  const classId = String(req.query.classId || '');
+  return ok(res, await teacherService.getClassRoster(requireTenant(req), classId));
+});
+
 /**
  * POST /api/teacher/broadsheet/save
  * Bulk save/update CA1, CA2 and Exam scores.

@@ -13,6 +13,7 @@ export const enrollStudentSchema = z.object({
   gender: z.enum(['Male', 'Female']),
   dob: z.coerce.date(),
   currentClass: z.string().min(1, 'Current class is required.').trim(),
+  classId: objectIdSchema.optional(),
   password: passwordSchema,
   guardian: z.string().trim().optional(),
   contact: z.string().trim().optional(),
@@ -77,8 +78,10 @@ export const updateTeacherSchema = z
   .object({
     name: z.string().min(2).trim().optional(),
     subject: z.string().trim().optional(),
+    classesTaught: z.number().int().min(1).max(20).optional(),
+    status: z.enum(['Active', 'On Leave']).optional(),
   })
-  .refine((v) => v.name !== undefined || v.subject !== undefined, {
+  .refine((v) => v.name !== undefined || v.subject !== undefined || v.classesTaught !== undefined || v.status !== undefined, {
     message: 'Provide at least one field to update.',
   });
 

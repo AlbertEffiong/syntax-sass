@@ -10,6 +10,8 @@ export interface ITeacher {
   email: string;
   password?: string;
   subject?: string;
+  classesTaught: number;
+  status: 'Active' | 'On Leave';
   /** OTP activation state. */
   verified: boolean;
   otpHash?: string;
@@ -27,6 +29,8 @@ const teacherSchema = new Schema<ITeacherDocument>(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, select: false },
     subject: { type: String, trim: true },
+    classesTaught: { type: Number, min: 1, max: 20, default: 1 },
+    status: { type: String, enum: ['Active', 'On Leave'], default: 'Active' },
     verified: { type: Boolean, default: false },
     otpHash: { type: String, select: false },
     otpExpiresAt: { type: Date, select: false },

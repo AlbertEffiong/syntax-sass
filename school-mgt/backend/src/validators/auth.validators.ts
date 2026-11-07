@@ -25,6 +25,8 @@ export const inviteTeacherSchema = z.object({
   name: z.string().min(2, 'Teacher name is required.').trim(),
   email: emailSchema,
   subject: z.string().trim().optional(),
+  classesTaught: z.number().int().min(1).max(20).optional(),
+  status: z.enum(['Active', 'On Leave']).optional(),
 });
 
 export const verifyOtpSchema = z.object({

@@ -7,6 +7,7 @@ import {
   broadsheetQuerySchema,
   saveBroadsheetSchema,
   submitBroadsheetSchema,
+  rosterQuerySchema,
 } from '../validators/teacher.validators';
 
 const router = Router();
@@ -20,6 +21,8 @@ router.use(authenticate, authorize('teacher'), enforceTenant);
  * @access Teacher
  */
 router.get('/classes-subjects', teacherController.getClassesSubjects);
+router.get('/context', teacherController.getContext);
+router.get('/roster', validate(rosterQuerySchema, 'query'), teacherController.getClassRoster);
 
 /**
  * @route  GET /api/teacher/broadsheet

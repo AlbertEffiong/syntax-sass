@@ -272,6 +272,9 @@
     removeTeacher: function (id) {
       return del('/api/admin/teachers/' + encodeURIComponent(id));
     },
+    resendTeacherOtp: function (id) {
+      return post('/api/admin/teachers/' + encodeURIComponent(id) + '/resend-otp');
+    },
     listAssessments: function (params) {
       return get('/api/admin/pending-assessments' + buildQuery(params));
     },
@@ -284,8 +287,14 @@
   };
 
   var teacher = {
+    context: function () {
+      return get('/api/teacher/context');
+    },
     classesSubjects: function () {
       return get('/api/teacher/classes-subjects');
+    },
+    roster: function (classId) {
+      return get('/api/teacher/roster' + buildQuery({ classId: classId }));
     },
     getBroadsheet: function (params) {
       return get('/api/teacher/broadsheet' + buildQuery(params));

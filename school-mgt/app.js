@@ -999,9 +999,9 @@ function adminDashboard() {
 
     <div class="grid stats-grid" style="margin-bottom:20px">
       <div class="card stat"><div class="stat-top"><div class="stat-icon blue">${ic.users}</div></div><div class="stat-value">${LIVE_API ? (s.students || 0) : (s.students || 348)}</div><div class="stat-label">Total Students</div><div class="stat-delta up">${ic.trend} <span>${LIVE_API ? "School register" : "+12 this term"}</span></div></div>
-      <div class="card stat"><div class="stat-top"><div class="stat-icon purple">${ic.userCheck}</div></div><div class="stat-value">24</div><div class="stat-label">Total Teachers</div><div class="stat-delta up"><span>2 on leave</span></div></div>
+      <div class="card stat"><div class="stat-top"><div class="stat-icon purple">${ic.userCheck}</div></div><div class="stat-value">${LIVE_API ? (s.teacherCount || 0) : 24}</div><div class="stat-label">Total Teachers</div><div class="stat-delta up"><span>${LIVE_API ? "School register" : "2 on leave"}</span></div></div>
       <div class="card stat"><div class="stat-top"><div class="stat-icon green">${ic.wallet}</div></div><div class="stat-value">${money(collected)}</div><div class="stat-label">Fees Collected</div><div class="stat-delta up">${ic.trend} <span>${pct}% of expected</span></div></div>
-      <div class="card stat"><div class="stat-top"><div class="stat-icon amber">${ic.clock}</div></div><div class="stat-value">${pendingAssessments().length}</div><div class="stat-label">Pending Results Approval</div><div class="stat-delta down"><span>Awaiting your review</span></div></div>
+      <div class="card stat"><div class="stat-top"><div class="stat-icon amber">${ic.clock}</div></div><div class="stat-value">${LIVE_API ? (s.pendingAssessmentCount || 0) : pendingAssessments().length}</div><div class="stat-label">Pending Results Approval</div><div class="stat-delta down"><span>Awaiting your review</span></div></div>
     </div>
 
     <div class="two-col">
@@ -1173,9 +1173,9 @@ function studentModal(st) {
   const gen = editing ? null : nextStudentId(state.school.id);
   const autoPass = editing ? (st.password || "") : genPassword(prefix);
   const studentClasses = LIVE_API
-    ? state.classes.filter((item) => String(item.schoolId) === String(state.school.id)).map((item) => item.name)
-    : CLASS_LEVELS;
-  if (editing && !studentClasses.includes(st.cls)) studentClasses.push(st.cls);
+    ? state.classes.filter((item) => String(item.schoolId) === String(state.school.id)).map((item) => ({ id: item.id, name: item.name }))
+    : CLASS_LEVELS.map((name) => ({ id: name, name }));
+  if (editing && !studentClasses.some((item) => item.name === st.cls)) studentClasses.push({ id: st.cls, name: st.cls });
   st = st || { name: "", gender: "", dob: "", guardian: "", contact: "", address: "", cls: CLASS_LEVELS[0], due: 0 };
   const err = (name) => `<span class="field-err" data-err="${name}"></span>`;
   openModal(`
@@ -1222,14 +1222,14 @@ function studentModal(st) {
         <div class="input-group">
           <div class="field">
             <label for="st-cls">Current Class</label>
-            <select class="select" id="st-cls" name="cls">${studentClasses.length ? studentClasses.map((c) => `<option ${c === st.cls ? "selected" : ""}>${esc(c)}</option>`).join("") : `<option value="" selected disabled>No classes configured</option>`}</select>
+            <select class="select" id="st-cls" name="cls">${studentClasses.length ? studentClasses.map((item) => `<option value="${esc(item.id)}" ${item.name === st.cls ? "selected" : ""}>${esc(item.name)}</option>`).join("") : `<option value="" selected disabled>No classes configured</option>`}</select>
             <span class="hint">${studentClasses.length ? (LIVE_API ? "Classes configured for this school." : "JSS1–JSS3 &amp; SS1–SS3") : `Add a class in <strong>Classes &amp; Subjects</strong> before enrolling students.`}</span>
           </div>
-          <div class="field">
+          ${editing ? `<div class="field">
             <label for="st-id">Student ID</label>
-            <input class="input code" id="st-id" name="id" value="${esc(editing ? st.id : (LIVE_API ? "Generated on save" : gen.id))}" readonly />
+            <input class="input code" id="st-id" name="id" value="${esc(st.id)}" readonly />
             <span class="hint">Prefix <strong>${esc(prefix)}</strong> · school-specific</span>
-          </div>
+          </div>` : ""}
         </div>
         <div class="field">
           <label for="st-address">Residential Address</label>
@@ -1624,10 +1624,7 @@ function inviteTeacherModal() {
             <label for="iv-classes">Classes Taught</label>
             <input class="input" id="iv-classes" name="classes" type="number" min="1" max="20" value="3" required />
           </div>
-          <div class="field">
-            <label for="iv-pass">Temporary Password</label>
-            <input class="input" id="iv-pass" name="password" value="${DEFAULT_TEACHER_PASSWORD}" required />
-          </div>
+          <div class="field"><span class="hint">The teacher chooses a password after verifying the email OTP.</span></div>
         </div>
       </div>
       <div class="modal-foot">
@@ -1646,11 +1643,16 @@ function otpModal(t) {
     </div>
     <form data-action="form:otp" data-id="${t.id}">
       <div class="modal-body">
-        <div class="demo-note" style="margin-bottom:14px"><strong>Simulated email OTP:</strong> ${esc(t.otp)}</div>
+        ${t.otp ? `<div class="demo-note" style="margin-bottom:14px"><strong>Development OTP:</strong> ${esc(t.otp)}</div>` : ""}
         <div class="field">
           <label for="otp-code">One-Time Password</label>
           <input class="input" id="otp-code" name="otp" inputmode="numeric" maxlength="6" placeholder="••••••" style="letter-spacing:.4em;text-align:center;font-size:20px;font-weight:700" required />
           <span class="hint">Verification links this account to ${esc(state.school.name)} and activates sign-in.</span>
+        </div>
+        <div class="field">
+          <label for="otp-password">Create Password</label>
+          <input class="input" id="otp-password" name="password" type="password" minlength="8" autocomplete="new-password" required />
+          <span class="hint">Use at least 8 characters with uppercase, lowercase, a number, and a symbol.</span>
         </div>
       </div>
       <div class="modal-foot">
@@ -2643,15 +2645,25 @@ document.addEventListener("click", (e) => {
       break;
     case "teacher:verify": {
       const t = teacherById(rawId);
-      if (t) { if (!t.otp) t.otp = randomOtp(); otpModal(t); }
+      if (t) otpModal(t);
       break;
     }
     case "teacher:resendOtp": {
       const t = teacherById(rawId);
       if (t) {
-        t.otp = randomOtp();
-        otpModal(t);
-        toast("OTP resent", `A new code was sent to ${t.email}.`, "info");
+        if (LIVE_API) {
+          SyntaxApi.admin.resendTeacherOtp(t.id).then((result) => {
+            liveUpsertTeacher(result.teacher);
+            const refreshed = teacherById(t.id);
+            refreshed.otp = result.otp;
+            otpModal(refreshed);
+            toast("OTP resent", `A new verification code was sent to ${t.email}.`, "success");
+          }).catch((err) => toast("OTP resend failed", err.message || "Could not resend the verification code.", "error"));
+        } else {
+          t.otp = randomOtp();
+          otpModal(t);
+          toast("OTP resent", `A new code was sent to ${t.email}.`, "info");
+        }
       }
       break;
     }
@@ -2708,7 +2720,8 @@ document.addEventListener("click", (e) => {
     }
 
     case "teacher:new":
-      teacherModal();
+      if (LIVE_API) inviteTeacherModal();
+      else teacherModal();
       break;
     case "teacher:edit": {
       const t = state.teachers.find((x) => x.id === rawId);
@@ -2734,10 +2747,17 @@ document.addEventListener("click", (e) => {
     }
     case "teacher:confirmDelete": {
       const t = state.teachers.find((x) => x.id === rawId);
-      state.teachers = state.teachers.filter((x) => x.id !== rawId);
-      closeModal();
-      toast("Teacher deleted", t ? t.name + " removed." : "", "error");
-      render();
+      if (!t) break;
+      const finish = () => {
+        state.teachers = state.teachers.filter((x) => x.id !== rawId);
+        closeModal();
+        toast("Teacher deleted", `${t.name} removed.`, "error");
+        render();
+      };
+      if (LIVE_API) {
+        SyntaxApi.admin.removeTeacher(t.id).then(finish)
+          .catch((err) => toast("Teacher deletion failed", err.message || "Could not remove this teacher.", "error"));
+      } else finish();
       break;
     }
 
@@ -2928,7 +2948,10 @@ document.addEventListener("click", (e) => {
         state.teacherSubjectFilter = "";
         const opts = subjectsForClass(name);
         state.teacherSubj = opts.includes(state.teacherSubj) ? state.teacherSubj : (opts[0] || "");
-        render();
+        if (LIVE_API && state.teacherSubj) {
+          liveLoadTeacherBroadsheet(name, state.teacherSubj).then(render)
+            .catch((err) => toast("Broadsheet load failed", err.message || "Could not load this class roster.", "error"));
+        } else render();
       }
       break;
     }
@@ -2942,6 +2965,43 @@ document.addEventListener("click", (e) => {
       if (!filled) { toast("No scores entered", "Fill in CA and exam scores for the broadsheet before submitting for approval.", "error"); break; }
       const cur = currentAssessment(cls, subj);
       if (cur && cur.status === "pending") { toast("Already pending approval", `${cls} · ${subj} is already awaiting the Principal's review.`, "info"); break; }
+      if (LIVE_API) {
+        const classRecord = state.classes.find((item) =>
+          String(item.schoolId) === String(state.school.id) && normClass(item.name) === normClass(cls),
+        );
+        if (!classRecord) { toast("Class unavailable", "This class is not in the school's backend curriculum.", "error"); break; }
+        const entries = rows.filter((row) => [row.ca1, row.ca2, row.exam].some((value) => value !== "" && value !== null && value !== undefined))
+          .map((row) => ({
+            studentId: row.studentId,
+            ca1: Number(row.ca1) || 0,
+            ca2: Number(row.ca2) || 0,
+            exam: Number(row.exam) || 0,
+          }));
+        (async () => {
+          try {
+            await SyntaxApi.teacher.saveBroadsheet({
+              classId: classRecord.id,
+              subject: subj,
+              term: state.teacherTerm || "First Term",
+              session: state.teacherSession || state.school.academic?.currentSession,
+              entries,
+            });
+            const result = await SyntaxApi.teacher.submitBroadsheet({
+              classId: classRecord.id,
+              subject: subj,
+              term: state.teacherTerm || "First Term",
+              session: state.teacherSession || state.school.academic?.currentSession,
+              principalName: principalName(state.school),
+            });
+            await liveLoadTeacherBroadsheet(cls, subj);
+            toast("Submitted for approval", `${cls} · ${subj}: ${result.submitted} score rows sent to the Principal.`, "success");
+            render();
+          } catch (err) {
+            toast("Submission failed", err.message || "Could not save and submit this broadsheet.", "error");
+          }
+        })();
+        break;
+      }
       if (cur) {
         cur.status = "pending"; cur.submittedAt = todayISO(); cur.note = "";
         cur.principal = principalName(state.school);
@@ -3067,7 +3127,14 @@ document.addEventListener("change", (e) => {
   const el = e.target.closest("[data-action]");
   if (!el) return;
   const action = el.getAttribute("data-action");
-  if (action === "teacher:subject") { state.teacherSubj = el.value; state.teacherSubjectFilter = ""; render(); }
+  if (action === "teacher:subject") {
+    state.teacherSubj = el.value;
+    state.teacherSubjectFilter = "";
+    if (LIVE_API) {
+      liveLoadTeacherBroadsheet(state.teacherCls, state.teacherSubj).then(render)
+        .catch((err) => toast("Broadsheet load failed", err.message || "Could not load saved scores.", "error"));
+    } else render();
+  }
   if (action === "teacher:file") {
     const file = el.files && el.files[0];
     importScoreFile(file, (count, fname) => {
@@ -3285,18 +3352,38 @@ document.addEventListener("submit", async (e) => {
   if (action === "form:inviteTeacher") {
     const data = new FormData(form);
     const email = String(data.get("email") || "").trim().toLowerCase();
+    const name = String(data.get("name") || "").trim();
+    const subjects = collectSubjects(form);
+    const classesTaught = Math.max(1, Number(data.get("classes")) || 1);
     if (state.teachers.some((t) => (t.email || "").toLowerCase() === email)) {
       toast("Email already invited", "A teacher with that email already exists.", "error");
+      return;
+    }
+    if (LIVE_API) {
+      try {
+        const result = await SyntaxApi.auth.inviteTeacher({
+          name,
+          email,
+          subject: subjects.join(", "),
+          classesTaught,
+        });
+        const teacher = liveUpsertTeacher(result.teacher);
+        teacher.otp = result.otp;
+        closeModal();
+        otpModal(teacher);
+        toast("Invite sent", `Verification instructions sent to ${email}.`, "success");
+      } catch (err) {
+        toast("Invite failed", err.message || "Could not invite this teacher.", "error");
+      }
       return;
     }
     const teacher = {
       id: "TCH" + Date.now().toString().slice(-6),
       schoolId: state.school.id,
-      name: String(data.get("name") || "").trim() || "New Teacher",
+      name: name || "New Teacher",
       email,
-      password: String(data.get("password") || DEFAULT_TEACHER_PASSWORD),
-      subjects: collectSubjects(form),
-      classes: Math.max(1, Number(data.get("classes")) || 1),
+      subjects,
+      classes: classesTaught,
       status: "Active",
       verified: false,
       otp: randomOtp(),
@@ -3313,6 +3400,20 @@ document.addEventListener("submit", async (e) => {
     const teacher = teacherById(form.getAttribute("data-id"));
     if (!teacher) { closeModal(); return; }
     const entered = String(data.get("otp") || "").trim();
+    const password = String(data.get("password") || "");
+    if (LIVE_API) {
+      try {
+        const activated = await SyntaxApi.auth.verifyOtp({ email: teacher.email, otp: entered, password });
+        liveUpsertTeacher(activated);
+        delete teacher.otp;
+        closeModal();
+        toast("Account verified", `${teacher.name} can now sign in to the Teacher Portal.`, "success");
+        render();
+      } catch (err) {
+        toast("Verification failed", err.message || "Could not verify this teacher account.", "error");
+      }
+      return;
+    }
     if (entered !== teacher.otp) {
       toast("Invalid OTP", "The code you entered is incorrect. Try again.", "error");
       return;
@@ -3350,7 +3451,11 @@ document.addEventListener("submit", async (e) => {
     const dob = String(data.get("dob") || "").trim();
     const guardian = String(data.get("guardian") || "").trim();
     const contact = String(data.get("contact") || "").trim();
-    const cls = String(data.get("cls") || "").trim();
+    const selectedClass = String(data.get("cls") || "").trim();
+    const selectedClassRecord = LIVE_API
+      ? state.classes.find((item) => String(item.id) === selectedClass && String(item.schoolId) === String(state.school.id))
+      : null;
+    const cls = selectedClassRecord ? selectedClassRecord.name : selectedClass;
     const address = String(data.get("address") || "").trim();
     const password = String(data.get("password") || "").trim();
     const owing = data.get("fee") === "owing";
@@ -3369,9 +3474,9 @@ document.addEventListener("submit", async (e) => {
     if (guardian.length < 2) fail("guardian", "Enter the parent/guardian name.");
     if (!/^[+()\d][\d\s()+.-]{6,}$/.test(contact)) fail("contact", "Enter a valid contact number.");
     const validClasses = LIVE_API
-      ? state.classes.filter((item) => String(item.schoolId) === String(state.school.id)).map((item) => item.name)
-      : CLASS_LEVELS;
-    if (validClasses.indexOf(cls) === -1) fail("cls", "Choose a valid class.");
+      ? state.classes.filter((item) => String(item.schoolId) === String(state.school.id))
+      : CLASS_LEVELS.map((name) => ({ name }));
+    if (LIVE_API ? !selectedClassRecord : !validClasses.some((item) => item.name === cls)) fail("cls", "Choose a valid class.");
     if (address.length < 4) fail("address", "Enter the residential address.");
     if ((!sid || password) && password.length < (LIVE_API ? 8 : 6)) fail("password", `Password must be at least ${LIVE_API ? 8 : 6} characters.`);
     if (!valid) { toast("Check the form", "Some fields need attention.", "error"); return; }
@@ -3390,6 +3495,7 @@ document.addEventListener("submit", async (e) => {
           gender,
           dob,
           currentClass: cls,
+          ...(LIVE_API && selectedClassRecord ? { classId: selectedClassRecord.id } : {}),
           guardian,
           contact,
           address,
@@ -3537,6 +3643,23 @@ document.addEventListener("submit", async (e) => {
     record.subject = record.subjects.join(", ");
     if (tid) {
       const t = state.teachers.find((x) => x.id === tid);
+      if (LIVE_API && t) {
+        try {
+          const updated = await SyntaxApi.admin.updateTeacher(t.id, {
+            name,
+            subject: record.subject,
+            classesTaught: record.classes,
+            status: record.status,
+          });
+          liveUpsertTeacher(updated);
+          closeModal();
+          toast("Teacher updated", `${name}'s record has been saved.`, "success");
+          render();
+        } catch (err) {
+          toast("Teacher update failed", err.message || "Could not update this teacher.", "error");
+        }
+        return;
+      }
       if (t) Object.assign(t, record);
       toast("Teacher updated", `${name}'s record has been saved.`);
     } else {
@@ -3652,8 +3775,8 @@ function liveUpsertTeacher(u) {
     name: u.name,
     subject: subjects.join(", "),
     subjects,
-    classes: 0,
-    status: "Active",
+    classes: Number(u.classesTaught) || 1,
+    status: u.status || "Active",
     email: u.email,
     verified: !!u.verified,
   };
@@ -3697,9 +3820,10 @@ function liveUpsertStudent(u) {
 
 async function liveLoadAdminData() {
   const schoolId = String(state.school.id);
-  const [dashboard, studentPage, classRows, schoolData] = await Promise.all([
+  const [dashboard, studentPage, teacherPage, classRows, schoolData] = await Promise.all([
     SyntaxApi.admin.dashboard(),
     SyntaxApi.admin.listStudents({ page: 1, limit: 100 }),
+    SyntaxApi.admin.listTeachers({ page: 1, limit: 100 }),
     SyntaxApi.admin.listClasses(),
     SyntaxApi.admin.getSchool(),
   ]);
@@ -3711,23 +3835,99 @@ async function liveLoadAdminData() {
     students.push(...(next.items || []));
     page += 1;
   }
+  const teachers = [...(teacherPage.items || [])];
+  page = 2;
+  while (teacherPage.hasNext && page <= teacherPage.totalPages) {
+    const next = await SyntaxApi.admin.listTeachers({ page, limit: 100 });
+    teachers.push(...(next.items || []));
+    page += 1;
+  }
 
   state.students = state.students.filter((student) => String(student.schoolId) !== schoolId);
   students.forEach((student) => liveUpsertStudent(student));
-  state.classes = state.classes.filter((item) => String(item.schoolId) !== schoolId).concat(
-    classRows.map((item) => ({
-      id: item.id,
-      schoolId,
-      name: item.className,
-      subjects: item.subjects || [],
-      teacher: item.teacherEmail || "",
-      students: 0,
-    })),
-  );
+  state.teachers = state.teachers.filter((teacher) => String(teacher.schoolId) !== schoolId);
+  teachers.forEach((teacher) => liveUpsertTeacher(teacher));
+  state.classes = classRows.map((item) => ({
+    id: item.id,
+    schoolId,
+    name: item.className,
+    subjects: item.subjects || [],
+    teacher: item.teacherEmail || "",
+    students: 0,
+  }));
   state.fees = dashboard.fees || { collected: 0, pending: 0, expected: 0 };
   state.school.students = dashboard.studentCount || 0;
+  state.school.teacherCount = dashboard.teacherCount || 0;
+  state.school.pendingAssessmentCount = dashboard.pendingAssessmentCount || 0;
   liveUpsertSchool(schoolData);
   state.school = schoolById(schoolId);
+}
+
+async function liveLoadTeacherData() {
+  const [schoolData, classRows] = await Promise.all([
+    SyntaxApi.teacher.context(),
+    SyntaxApi.teacher.classesSubjects(),
+  ]);
+  const school = liveUpsertSchool(schoolData);
+  state.school = school;
+  state.classes = classRows.map((item) => ({
+    id: item.id,
+    schoolId: school.id,
+    name: item.className,
+    subjects: item.subjects || [],
+    teacher: item.teacherEmail || "",
+    students: 0,
+  }));
+  const firstClass = state.classes[0];
+  state.teacherCls = firstClass?.name || "";
+  state.teacherSubj = firstClass?.subjects?.[0] || "";
+  state.teacherTerm = school.academic?.currentTerm || "First Term";
+  state.teacherSession = school.academic?.currentSession || "";
+  if (firstClass && state.teacherSubj) await liveLoadTeacherBroadsheet(firstClass.name, state.teacherSubj);
+}
+
+async function liveLoadTeacherBroadsheet(className, subject) {
+  const cls = state.classes.find((item) =>
+    String(item.schoolId) === String(state.school.id) && normClass(item.name) === normClass(className),
+  );
+  if (!cls || !subject) return;
+  const [roster, assessments] = await Promise.all([
+    SyntaxApi.teacher.roster(cls.id),
+    SyntaxApi.teacher.getBroadsheet({
+      classId: cls.id,
+      subject,
+      term: state.teacherTerm || "First Term",
+      session: state.teacherSession || state.school.academic?.currentSession || "",
+    }),
+  ]);
+  const scoreById = new Map(assessments.map((assessment) => [String(assessment.studentId).toUpperCase(), assessment]));
+  const rows = roster.map((student) => {
+    const saved = scoreById.get(String(student.studentId).toUpperCase());
+    liveUpsertStudent({ ...student, schoolId: state.school.id });
+    return {
+      studentId: student.studentId,
+      name: student.fullName,
+      ca1: saved ? saved.ca1 : "",
+      ca2: saved ? saved.ca2 : "",
+      exam: saved ? saved.exam : "",
+    };
+  });
+  scoreStore[scoreKey(className, subject)] = rows;
+  state.assessments = state.assessments.filter((item) =>
+    !(String(item.schoolId) === String(state.school.id) && normClass(item.cls) === normClass(className) &&
+      String(item.subject).toLowerCase() === String(subject).toLowerCase()),
+  ).concat(assessments.map((assessment) => ({
+    id: assessment.id,
+    schoolId: state.school.id,
+    teacherId: assessment.teacherId,
+    cls: assessment.className,
+    subject: assessment.subject,
+    term: assessment.term,
+    session: assessment.session,
+    submittedAt: assessment.submittedAt,
+    status: assessment.status === "Pending Approval" ? "pending" : assessment.status === "Revised" ? "revised" : "approved",
+    note: assessment.note || "",
+  })));
 }
 
 async function liveLoadStudentResult(term) {
@@ -3790,9 +3990,9 @@ async function liveLogin(role, form) {
       else toast("Welcome", `Signed in to ${school.name}.`);
     } else if (role === "teacher") {
       const t = liveUpsertTeacher(res.user);
-      state.school = schoolById(t.schoolId) || state.school;
       state.auth.tier = "teacher";
       state.auth.teacher = { loggedIn: true, teacherId: t.id, email: t.email };
+      await liveLoadTeacherData();
       toast("Welcome", `Signed in as ${t.name}.`);
     }
     saveSession();
