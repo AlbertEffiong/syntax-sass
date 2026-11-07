@@ -14,14 +14,21 @@ export interface MailMessage {
  * codebase depends only on `sendMail`, so swapping providers is a one-file change.
  */
 async function deliver(message: MailMessage): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.MAIL_FROM || 'support@innovempia.com';
+  if (apiKey) {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to: message.to, subject: message.subject, text: message.text, html: message.html }),
+    });
+    if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
+    return;
+  }
   if (env.isProduction) {
-    // TODO: integrate a real transactional email provider here.
-    // e.g. await provider.send({ from: env.mailFrom, ...message });
-    // eslint-disable-next-line no-console
     console.warn(`[mail] No provider configured; email to ${message.to} was NOT sent.`);
     return;
   }
-  // eslint-disable-next-line no-console
   console.log(`[mail] (dev) to=${message.to} subject="${message.subject}"\n${message.text}`);
 }
 
