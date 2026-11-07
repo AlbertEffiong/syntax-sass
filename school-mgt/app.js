@@ -1222,8 +1222,8 @@ function studentModal(st) {
         <div class="input-group">
           <div class="field">
             <label for="st-cls">Current Class</label>
-            <select class="select" id="st-cls" name="cls">${studentClasses.map((c) => `<option ${c === st.cls ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
-            <span class="hint">JSS1–JSS3 &amp; SS1–SS3</span>
+            <select class="select" id="st-cls" name="cls">${studentClasses.length ? studentClasses.map((c) => `<option ${c === st.cls ? "selected" : ""}>${esc(c)}</option>`).join("") : `<option value="" selected disabled>No classes configured</option>`}</select>
+            <span class="hint">${studentClasses.length ? (LIVE_API ? "Classes configured for this school." : "JSS1–JSS3 &amp; SS1–SS3") : `Add a class in <strong>Classes &amp; Subjects</strong> before enrolling students.`}</span>
           </div>
           <div class="field">
             <label for="st-id">Student ID</label>
@@ -3454,6 +3454,33 @@ document.addEventListener("submit", async (e) => {
     const teacher = String(data.get("teacher") || "").trim() || "—";
     const subjects = uniqueSubjects(collectSubjects(form));
     if (!subjects.length) { toast("Add at least one subject", "Tag the subjects taught in this class before saving.", "error"); return; }
+    if (LIVE_API && !id) {
+      try {
+        const teacherRecord = state.teachers.find((item) =>
+          String(item.schoolId) === String(state.school.id) &&
+          (item.name.toLowerCase() === teacher.toLowerCase() || item.email.toLowerCase() === teacher.toLowerCase()),
+        );
+        const saved = await SyntaxApi.admin.createClass({
+          className: name,
+          subjects,
+          ...(teacherRecord ? { teacherEmail: teacherRecord.email } : {}),
+        });
+        state.classes.push({
+          id: saved.id,
+          schoolId: state.school.id,
+          name: saved.className,
+          teacher: saved.teacherEmail || "",
+          subjects: saved.subjects || subjects,
+          students: 0,
+        });
+        closeModal();
+        toast("Class created", `${name} added to this school's curriculum.`, "success");
+        render();
+      } catch (err) {
+        toast("Class creation failed", err.message || "Could not save this class.", "error");
+      }
+      return;
+    }
     if (id) {
       const c = state.classes.find((x) => x.id === id);
       if (c) { Object.assign(c, { name, teacher, subjects }); toast("Class updated", `${name} and its subjects were saved.`); }
@@ -3610,6 +3637,13 @@ function liveUpsertSchool(u) {
   return state.schools.find((s) => String(s.id) === String(u.id));
 }
 
+async function liveLoadOwnerSchools() {
+  const res = await SyntaxApi.owner.listSchools({ page: 1, limit: 100 });
+  const items = (res && res.items) || [];
+  state.schools = [];
+  items.forEach((school) => liveUpsertSchool(school));
+}
+
 function liveUpsertTeacher(u) {
   const subjects = String(u.subject || "").split(",").map((s) => s.trim()).filter(Boolean);
   const rec = {
@@ -3740,7 +3774,12 @@ async function liveLogin(role, form) {
 
     if (role === "owner") {
       state.auth.tier = "owner";
-      toast("Welcome back", "Signed in to the Platform Console.");
+      try {
+        await liveLoadOwnerSchools();
+        toast("Welcome back", "Signed in to the Platform Console.");
+      } catch (err) {
+        toast("School list unavailable", err.message || "Signed in, but schools could not be loaded.", "error");
+      }
     } else if (role === "admin") {
       const school = liveUpsertSchool(res.user);
       state.school = school;
@@ -3780,10 +3819,7 @@ async function liveRestore() {
     if (u.role === "owner") {
       state.auth.tier = "owner";
       try {
-        const res = await window.SyntaxApi.owner.listSchools({ page: 1, limit: 100 });
-        const items = (res && res.data && res.data.items) || (res && res.items) || [];
-        state.schools = [];
-        items.forEach((x) => liveUpsertSchool(x));
+        await liveLoadOwnerSchools();
       } catch (e) {}
     } else if (u.role === "admin") {
       const school = liveUpsertSchool(await SyntaxApi.admin.getSchool());
