@@ -27,6 +27,13 @@ export interface SchoolPublic {
     termsPerSession: number;
   };
   hasPendingPayment: boolean;
+  pendingPayment?: {
+    reference: string;
+    amount: number;
+    submittedAt: Date;
+    status: string;
+    receipt?: { fileName: string; contentType: string };
+  };
   createdAt: Date;
 }
 
@@ -47,6 +54,18 @@ export function serializeSchool(school: ISchoolDocument): SchoolPublic {
       termsPerSession: school.academic?.termsPerSession ?? 3,
     },
     hasPendingPayment: !!school.pendingPayment,
+    pendingPayment: school.pendingPayment ? {
+      reference: school.pendingPayment.reference,
+      amount: school.pendingPayment.amount,
+      submittedAt: school.pendingPayment.submittedAt,
+      status: school.pendingPayment.status,
+      ...(school.pendingPayment.receipt ? {
+        receipt: {
+          fileName: school.pendingPayment.receipt.fileName,
+          contentType: school.pendingPayment.receipt.contentType,
+        },
+      } : {}),
+    } : undefined,
     createdAt: school.createdAt,
   };
 }

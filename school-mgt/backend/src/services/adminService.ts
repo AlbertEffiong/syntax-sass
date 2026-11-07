@@ -4,12 +4,14 @@ import { School } from '../models/School';
 import { Student } from '../models/Student';
 import { Teacher } from '../models/Teacher';
 import { Assessment, AssessmentStatus } from '../models/Assessment';
+import { SchoolActivity } from '../models/SchoolActivity';
 import { ApiError } from '../utils/ApiError';
 import { assertSameSchool } from '../utils/security';
 import { generateStudentId } from '../utils/studentId';
 import { hashPassword } from '../utils/password';
 import { paginate, Paginated, Pagination } from '../utils/pagination';
 import { cache } from '../utils/cache';
+import { recordSchoolActivity } from '../utils/activity';
 import {
   ClassPublic,
   serializeClass,
@@ -69,6 +71,11 @@ export interface BankTransferInput {
   schoolId: string;
   reference: string;
   amount: number;
+  receipt?: {
+    fileName: string;
+    contentType: 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf';
+    contentBase64: string;
+  };
 }
 
 /**
@@ -97,6 +104,7 @@ export async function createClass(input: CreateClassInput): Promise<ClassPublic>
     subjects,
     teacherEmail: input.teacherEmail?.toLowerCase(),
   });
+  await recordSchoolActivity(input.schoolId, 'class.created', 'Class added', `${cls.className} added to the school curriculum.`);
   return serializeClass(cls);
 }
 
@@ -158,6 +166,7 @@ export async function enrollStudent(input: EnrollStudentInput): Promise<StudentP
   });
 
   await cache.invalidatePrefix(`students:${input.schoolId}:`);
+  await recordSchoolActivity(input.schoolId, 'student.enrolled', 'Student enrolled', `${student.fullName} enrolled in ${student.currentClass}.`);
   return serializeStudent(student);
 }
 
@@ -190,6 +199,7 @@ export async function updateStudent(
 
   await student.save();
   await cache.invalidatePrefix(`students:${schoolId}:`);
+  await recordSchoolActivity(schoolId, 'student.updated', 'Student record updated', `${student.fullName}'s record was updated.`);
   return serializeStudent(student);
 }
 
@@ -209,12 +219,13 @@ export async function recordFeePayment(
   student.feeCollected += amount;
   await student.save();
   await cache.invalidatePrefix(`students:${schoolId}:`);
+  await recordSchoolActivity(schoolId, 'fee.payment', 'Fee payment recorded', `${student.fullName}: ${amount} received.`);
   return serializeStudent(student);
 }
 
 export async function getDashboard(schoolId: string) {
   const tenantId = new Types.ObjectId(schoolId);
-  const [[summary], teacherCount, pendingAssessmentCount] = await Promise.all([
+  const [[summary], teacherCount, pendingAssessmentCount, recentActivity] = await Promise.all([
     Student.aggregate([
       { $match: { schoolId: tenantId } },
       {
@@ -230,6 +241,7 @@ export async function getDashboard(schoolId: string) {
     ]),
     Teacher.countDocuments({ schoolId: tenantId }),
     Assessment.countDocuments({ schoolId: tenantId, status: 'Pending Approval' }),
+    SchoolActivity.find({ schoolId: tenantId }).sort({ createdAt: -1 }).limit(8).lean(),
   ]);
 
   return {
@@ -237,6 +249,13 @@ export async function getDashboard(schoolId: string) {
     teacherCount,
     pendingAssessmentCount,
     debtorCount: summary?.debtorCount ?? 0,
+    recentActivity: recentActivity.map((item) => ({
+      id: String(item._id),
+      type: item.type,
+      title: item.title,
+      details: item.details,
+      createdAt: item.createdAt,
+    })),
     fees: {
       expected: summary?.feeExpected ?? 0,
       collected: summary?.feeCollected ?? 0,
@@ -315,6 +334,7 @@ export async function updateTeacher(
   if (patch.status !== undefined) teacher.status = patch.status;
   await teacher.save();
   await cache.invalidatePrefix(`teachers:${schoolId}:`);
+  await recordSchoolActivity(schoolId, 'teacher.updated', 'Teacher profile updated', `${teacher.name}'s profile was updated.`);
   return serializeTeacher(teacher);
 }
 
@@ -329,6 +349,7 @@ export async function removeTeacher(schoolId: string, teacherId: string): Promis
   assertSameSchool(teacher.schoolId, schoolId);
   await teacher.deleteOne();
   await cache.invalidatePrefix(`teachers:${schoolId}:`);
+  await recordSchoolActivity(schoolId, 'teacher.removed', 'Teacher removed', `${teacher.name} was removed from staff.`);
 }
 
 /**
@@ -379,6 +400,12 @@ export async function reviewAssessment(input: ReviewAssessmentInput): Promise<As
     assessment.note = input.note ?? 'Returned for revision.';
   }
   await assessment.save();
+  await recordSchoolActivity(
+    input.schoolId,
+    'assessment.reviewed',
+    input.action === 'approve' ? 'Results approved' : 'Results returned for revision',
+    `${assessment.className} · ${assessment.subject} was ${input.action === 'approve' ? 'approved' : 'returned for revision'}.`,
+  );
   return serializeAssessment(assessment);
 }
 
@@ -396,9 +423,27 @@ export async function submitBankTransfer(input: BankTransferInput): Promise<Scho
     amount: input.amount,
     submittedAt: new Date(),
     status: 'pending',
+    receipt: input.receipt,
   };
   await school.save();
+  await recordSchoolActivity(input.schoolId, 'subscription.payment_submitted', 'Subscription payment submitted', `Transfer reference ${input.reference.trim()} submitted for verification.`);
   return serializeSchool(school);
+}
+
+export async function getSubscription(schoolId: string) {
+  const school = await School.findById(schoolId);
+  if (!school) throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');
+  const publicSchool = serializeSchool(school);
+  return {
+    ...publicSchool,
+    pendingPayment: school.pendingPayment ? {
+      reference: school.pendingPayment.reference,
+      amount: school.pendingPayment.amount,
+      submittedAt: school.pendingPayment.submittedAt,
+      status: school.pendingPayment.status,
+      ...(school.pendingPayment.receipt ? { receipt: school.pendingPayment.receipt } : {}),
+    } : undefined,
+  };
 }
 
 export interface AcademicSettingInput {

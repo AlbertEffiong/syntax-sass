@@ -150,6 +150,11 @@ export const submitBankTransfer = asyncHandler(async (req: Request, res: Respons
   return ok(res, school, 'Payment reference submitted. Awaiting owner verification.');
 });
 
+export const getSubscription = asyncHandler(async (req: Request, res: Response) => {
+  const subscription = await adminService.getSubscription(requireTenant(req));
+  return ok(res, subscription);
+});
+
 /**
  * GET /api/admin/school
  * Returns the tenant's school profile/settings.

@@ -10,6 +10,7 @@ import { hashPassword, verifyPassword, isStrongPassword, PASSWORD_POLICY_MESSAGE
 import { generateOtp, verifyOtp } from '../utils/otp';
 import { sendTeacherOtpEmail } from '../utils/mailer';
 import { cache } from '../utils/cache';
+import { recordSchoolActivity } from '../utils/activity';
 import { env } from '../config/env';
 import {
   OwnerPublic,
@@ -52,6 +53,7 @@ export interface InviteTeacherInput {
   subject?: string;
   classesTaught?: number;
   status?: 'Active' | 'On Leave';
+  initialPassword?: string;
 }
 
 export interface InviteTeacherResult {
@@ -63,7 +65,7 @@ export interface InviteTeacherResult {
 export interface VerifyOtpInput {
   email: string;
   otp: string;
-  password: string;
+  password?: string;
 }
 
 /**
@@ -248,6 +250,7 @@ export async function inviteTeacher(input: InviteTeacherInput): Promise<InviteTe
     subject: input.subject,
     classesTaught: input.classesTaught ?? 1,
     status: input.status ?? 'Active',
+    ...(input.initialPassword ? { password: await hashPassword(input.initialPassword) } : {}),
     verified: false,
     otpHash: hash,
     otpExpiresAt: expiresAt,
@@ -256,6 +259,7 @@ export async function inviteTeacher(input: InviteTeacherInput): Promise<InviteTe
   const school = await School.findById(input.schoolId);
   await sendTeacherOtpEmail(email, code, school?.name ?? 'your school');
   await cache.invalidatePrefix(`teachers:${input.schoolId}:`);
+  await recordSchoolActivity(input.schoolId, 'teacher.invited', 'Teacher invited', `${teacher.name} (${teacher.email}) was invited to the school.`);
 
   // Outside production the OTP is also returned so it can be tested manually.
   const result: InviteTeacherResult = { teacher: serializeTeacher(teacher) };
@@ -283,10 +287,10 @@ export async function resendTeacherOtp(schoolId: string, teacherId: string): Pro
  * Validates a teacher OTP, sets their password and activates the account.
  */
 export async function activateTeacherWithOtp(input: VerifyOtpInput): Promise<TeacherPublic> {
-  assertStrongPassword(input.password);
+  if (input.password) assertStrongPassword(input.password);
   const email = input.email.toLowerCase().trim();
 
-  const teacher = await Teacher.findOne({ email }).select('+otpHash +otpExpiresAt');
+  const teacher = await Teacher.findOne({ email }).select('+password +otpHash +otpExpiresAt');
   if (!teacher) {
     throw ApiError.notFound('No pending invitation found for this email.', 'INVITE_NOT_FOUND');
   }
@@ -299,12 +303,16 @@ export async function activateTeacherWithOtp(input: VerifyOtpInput): Promise<Tea
     throw ApiError.badRequest('Invalid or expired OTP.', 'INVALID_OTP');
   }
 
-  teacher.password = await hashPassword(input.password);
+  if (input.password) teacher.password = await hashPassword(input.password);
+  if (!teacher.password) {
+    throw ApiError.badRequest('A password must be set before this teacher account can be activated.', 'PASSWORD_REQUIRED');
+  }
   teacher.verified = true;
   teacher.otpHash = undefined;
   teacher.otpExpiresAt = undefined;
   await teacher.save();
   await cache.invalidatePrefix(`teachers:${teacher.schoolId}:`);
+  await recordSchoolActivity(String(teacher.schoolId), 'teacher.verified', 'Teacher account verified', `${teacher.name} completed OTP verification.`);
 
   return serializeTeacher(teacher);
 }

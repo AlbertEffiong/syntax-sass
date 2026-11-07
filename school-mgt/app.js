@@ -95,7 +95,6 @@ const state = {
     { id: "CLS2", schoolId: 1, name: "SS 3 Science", teacher: "Mr. F. Danjuma", subjects: ["Physics", "Chemistry", "Biology", "Further Mathematics", "Mathematics"], students: 0 },
   ]),
   fees: { collected: 12450, pending: 3180, expected: 15630 },
-  pendingResults: 6,
   assessments: [
     { id: "ASM-1001", schoolId: 1, teacherId: "TCH4", teacher: "Mr. F. Danjuma", cls: "SS1", subject: "Physics", term: "First Term", submittedAt: "2026-10-09", status: "pending", note: "" },
     { id: "ASM-1002", schoolId: 1, teacherId: "TCH2", teacher: "Mr. C. Okafor", cls: "JSS2", subject: "English Language", term: "First Term", submittedAt: "2026-10-09", status: "pending", note: "" },
@@ -172,7 +171,8 @@ function money(n) {
   return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(Number(n) || 0);
 }
 function fmtDate(iso) {
-  const d = new Date(iso + "T00:00:00");
+  const value = String(iso || "");
+  const d = new Date(value.length <= 10 ? value + "T00:00:00" : value);
   if (isNaN(d)) return iso;
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
@@ -634,7 +634,7 @@ function superAdmin() {
         <div class="avatar" style="background:var(--amber-bg);color:var(--amber)">${initials(s.name)}</div>
         <div>
           <div class="cell-strong">${esc(s.name)}</div>
-          <div class="cell-muted">Ref ${esc(s.pendingPayment.reference)} · ${money(s.pendingPayment.amount || s.plan)} · submitted ${fmtDate(s.pendingPayment.submittedAt)}${s.pendingPayment.receipt ? " · receipt " + esc(s.pendingPayment.receipt) : ""}</div>
+          <div class="cell-muted">Ref ${esc(s.pendingPayment.reference)} · ${money(s.pendingPayment.amount || s.plan)} · submitted ${fmtDate(s.pendingPayment.submittedAt)}${s.pendingPayment.receipt ? " · receipt " + esc(s.pendingPayment.receipt.fileName || s.pendingPayment.receipt) : ""}</div>
         </div>
       </div>
       <div class="row-actions">
@@ -1106,7 +1106,7 @@ function adminStudents() {
       ${kpi("Total Students", list.length, ic.users, "#6366f1")}
       ${kpi("Fees Cleared", list.length - owing.length, ic.check, "#16a34a")}
       ${kpi("Owing Fees", owing.length, ic.alert, "#dc2626")}
-      ${kpi("Awaiting Results", state.pendingResults, ic.clock, "#d97706")}
+      ${kpi("Awaiting Results", pendingAssessments().length, ic.clock, "#d97706")}
     </div>
 
     <div class="card" style="margin-bottom:18px">
@@ -1395,7 +1395,7 @@ function adminTeachers() {
         <div class="row-actions">
           ${t.verified
             ? `<button class="icon-btn" data-action="teacher:edit" data-id="${t.id}" title="Edit teacher">${ic.edit}</button>`
-            : `<button class="btn btn-soft btn-sm" data-action="teacher:verify" data-id="${t.id}" title="Enter OTP">${ic.shield}<span>Verify</span></button>`}
+            : `<button class="btn btn-soft btn-sm" data-action="teacher:resendOtp" data-id="${t.id}" title="Resend verification OTP">${ic.refresh}<span>Resend OTP</span></button>`}
           <button class="icon-btn danger" data-action="teacher:delete" data-id="${t.id}" title="Delete teacher">${ic.trash}</button>
         </div>
       </td>
@@ -1535,6 +1535,31 @@ function copyTextToClipboard(text) {
   } catch (e) {}
 }
 
+function readReceiptFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const value = String(reader.result || "");
+      resolve(value.split(",", 2)[1] || "");
+    };
+    reader.onerror = () => reject(new Error("Could not read the selected receipt file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function openReceipt(receipt) {
+  if (!receipt || !receipt.contentBase64 || !receipt.contentType) {
+    toast("Receipt unavailable", "No receipt file was attached to this payment.", "error");
+    return;
+  }
+  const binary = atob(receipt.contentBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  const url = URL.createObjectURL(new Blob([bytes], { type: receipt.contentType }));
+  window.open(url, "_blank", "noopener");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 function teacherModal(t) {
   const editing = !!t;
   t = t || { name: "", subject: "Mathematics", classes: 3, status: "Active" };
@@ -1599,6 +1624,7 @@ function paymentModal(st) {
 }
 
 function inviteTeacherModal() {
+  const initialPassword = genPassword("Teacher");
   openModal(`
     <div class="modal-head">
       <div><h3>Invite Teacher</h3><div class="sub">Send a verified invite to a new staff member.</div></div>
@@ -1613,7 +1639,7 @@ function inviteTeacherModal() {
         <div class="field">
           <label for="iv-email">Work Email</label>
           <input class="input" id="iv-email" name="email" type="email" placeholder="teacher@yourschool.edu" required />
-          <span class="hint">A one-time password (OTP) will be sent here for verification.</span>
+          <span class="hint">An OTP will be sent here. The teacher verifies after signing in with the generated password.</span>
         </div>
         <div class="field">
           <label>Subjects Handled</label>
@@ -1624,12 +1650,52 @@ function inviteTeacherModal() {
             <label for="iv-classes">Classes Taught</label>
             <input class="input" id="iv-classes" name="classes" type="number" min="1" max="20" value="3" required />
           </div>
-          <div class="field"><span class="hint">The teacher chooses a password after verifying the email OTP.</span></div>
+          <div class="field">
+            <label for="iv-pass">Generated Sign-in Password</label>
+            <input class="input code" id="iv-pass" name="initialPassword" value="${esc(initialPassword)}" readonly required />
+            <span class="hint">Share this password securely with the teacher.</span>
+          </div>
         </div>
       </div>
       <div class="modal-foot">
         <button type="button" class="btn btn-ghost" data-action="modal:close">Cancel</button>
         <button type="submit" class="btn btn-primary">${ic.shield}<span>Send Invite &amp; OTP</span></button>
+      </div>
+    </form>
+  `);
+}
+
+function teacherInviteCredentialsModal(teacher, password) {
+  openModal(`
+    <div class="modal-head">
+      <div><h3>Teacher Invited</h3><div class="sub">The verification code was sent to ${esc(teacher.email)}.</div></div>
+      <button class="close-x" data-action="modal:close">${ic.x}</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>Sign-in Email</label><input class="input" value="${esc(teacher.email)}" readonly /></div>
+      <div class="field"><label>Generated Password</label><input class="input code" value="${esc(password)}" readonly /></div>
+      <div class="demo-note">The teacher signs in with these credentials, then enters the OTP from their email. The account stays restricted until they verify.</div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-primary" data-action="modal:close">Done</button></div>
+  `);
+}
+
+function teacherLoginOtpModal(email) {
+  openModal(`
+    <div class="modal-head">
+      <div><h3>Verify Teacher Sign-in</h3><div class="sub">Enter the 6-digit OTP sent to ${esc(email)}.</div></div>
+      <button class="close-x" data-action="modal:close">${ic.x}</button>
+    </div>
+    <form data-action="form:teacherOtpLogin">
+      <div class="modal-body">
+        <div class="field">
+          <label for="teacher-login-otp">Email OTP</label>
+          <input class="input" id="teacher-login-otp" name="otp" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required />
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" data-action="modal:close">Cancel</button>
+        <button type="submit" class="btn btn-primary">${ic.shield}<span>Verify and Continue</span></button>
       </div>
     </form>
   `);
@@ -1795,9 +1861,9 @@ function adminSubscription() {
         <h3 style="margin-bottom:14px">Manage Plan · Renew Subscription</h3>
         ${pend ? `
         <div class="demo-note" style="margin-bottom:14px">A bank transfer for <strong>${money(s.plan)}</strong> is awaiting verification. No further action needed until the platform owner confirms payment.</div>
-        <button class="btn btn-ghost btn-block" data-action="demo:expire">${ic.alert}<span>Simulate Expiry</span></button>` : `
+        ${LIVE_API ? "" : `<button class="btn btn-ghost btn-block" data-action="demo:expire">${ic.alert}<span>Simulate Expiry</span></button>`}` : `
         <button class="btn btn-primary btn-block" data-action="bank:renew" style="margin-bottom:10px">${ic.card}<span>Make Bank Transfer / Renew — ${money(s.plan)}/mo</span></button>
-        <button class="btn btn-ghost btn-block" data-action="demo:expire">${ic.alert}<span>Simulate Expiry</span></button>`}
+        ${LIVE_API ? "" : `<button class="btn btn-ghost btn-block" data-action="demo:expire">${ic.alert}<span>Simulate Expiry</span></button>`}`}
         ${pend ? "" : `<div class="demo-note" style="margin-top:16px">Renewal is by <strong>bank transfer only</strong>. Pay via <strong>${BANK_DETAILS.bank}</strong> (${BANK_DETAILS.accountNumber}) and confirm here — the owner verifies and unlocks your portal.</div>`}
       </div>
     </div>`;
@@ -2634,6 +2700,13 @@ document.addEventListener("click", (e) => {
       state.adminSection = btn.getAttribute("data-section");
       setNavOpen(false);
       render();
+      if (LIVE_API && state.adminSection === "subscription") {
+        SyntaxApi.admin.getSubscription().then((subscription) => {
+          liveUpsertSchool(subscription);
+          state.school = schoolById(subscription.id);
+          render();
+        }).catch((err) => toast("Subscription refresh failed", err.message || "Could not refresh subscription details.", "error"));
+      }
       break;
 
     case "super:new":
@@ -2863,7 +2936,8 @@ document.addEventListener("click", (e) => {
 
     case "payment:receipt": {
       const rec = state.school.pendingPayment;
-      if (rec && rec.receipt) toast("Receipt attached", rec.receipt, "info");
+      if (rec && rec.receipt) openReceipt(rec.receipt);
+      else toast("Receipt unavailable", "No receipt file was attached to this payment.", "error");
       break;
     }
 
@@ -3616,9 +3690,40 @@ document.addEventListener("submit", async (e) => {
     if (!reference) { toast("Reference required", "Enter the transfer reference to confirm your payment.", "error"); return; }
     let receipt = "";
     const file = data.get("receipt");
-    if (file) {
-      if (typeof file === "object" && file.name) receipt = String(file.name);
-      else if (typeof file === "string") receipt = file.trim();
+    if (file && typeof file === "object" && file.name) {
+      if (LIVE_API && file.size > 650_000) {
+        toast("Receipt too large", "Choose a receipt smaller than 650 KB.", "error");
+        return;
+      }
+      if (LIVE_API && !["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type)) {
+        toast("Unsupported receipt", "Upload a JPG, PNG, WebP, or PDF receipt.", "error");
+        return;
+      }
+      receipt = String(file.name);
+    } else if (typeof file === "string") {
+      receipt = file.trim();
+    }
+    if (LIVE_API) {
+      try {
+        const receiptPayload = file && typeof file === "object" && file.name ? {
+          fileName: file.name,
+          contentType: file.type,
+          contentBase64: await readReceiptFile(file),
+        } : undefined;
+        const updated = await SyntaxApi.admin.submitBankTransfer({
+          reference,
+          amount: Number(s.plan) || 0,
+          ...(receiptPayload ? { receipt: receiptPayload } : {}),
+        });
+        liveUpsertSchool(updated);
+        state.school = schoolById(s.id);
+        closeModal();
+        toast("Submission received", `Your ${BANK_DETAILS.bank} transfer is pending verification by the platform owner.`, "success");
+        render();
+      } catch (err) {
+        toast("Submission failed", err.message || "Could not submit the bank transfer details.", "error");
+      }
+      return;
     }
     const pend = { reference, receipt, amount: s.plan, submittedAt: new Date().toISOString().slice(0, 10), status: "pending" };
     if (state.school) state.school.pendingPayment = pend;
@@ -3747,6 +3852,7 @@ function liveUpsertSchool(u) {
     status: liveMapStatus(u.subscriptionStatus),
     renewal: iso,
     plan: u.planMonthly || 0,
+    pendingPayment: u.pendingPayment || null,
     adminEmail: u.email,
     principal: u.principalName || "",
     principalName: u.principalName || "",
@@ -3825,7 +3931,7 @@ async function liveLoadAdminData() {
     SyntaxApi.admin.listStudents({ page: 1, limit: 100 }),
     SyntaxApi.admin.listTeachers({ page: 1, limit: 100 }),
     SyntaxApi.admin.listClasses(),
-    SyntaxApi.admin.getSchool(),
+    SyntaxApi.admin.getSubscription(),
   ]);
 
   const students = [...(studentPage.items || [])];

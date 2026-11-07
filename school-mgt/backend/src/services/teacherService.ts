@@ -6,6 +6,7 @@ import { Assessment } from '../models/Assessment';
 import { ApiError } from '../utils/ApiError';
 import { computeTotal, gradeFor } from '../utils/grading';
 import { serializeClass, ClassPublic, serializeAssessment, AssessmentPublic, serializeSchool } from '../utils/serialize';
+import { recordSchoolActivity } from '../utils/activity';
 
 export interface ScoreEntry {
   studentId: string;
@@ -196,6 +197,13 @@ export async function submitBroadsheet(
       'NOTHING_TO_SUBMIT',
     );
   }
+
+  await recordSchoolActivity(
+    input.schoolId,
+    'assessment.submitted',
+    'Results submitted for approval',
+    `${cls.className} · ${canonicalSubject}: ${submitted} score rows submitted.`,
+  );
 
   return { submitted, principalName };
 }

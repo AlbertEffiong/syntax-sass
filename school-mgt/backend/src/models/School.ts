@@ -20,6 +20,11 @@ export interface IPendingPayment {
   amount: number;
   submittedAt: Date;
   status: 'pending' | 'verified' | 'rejected';
+  receipt?: {
+    fileName: string;
+    contentType: string;
+    contentBase64: string;
+  };
 }
 
 export interface ISchool {
@@ -70,6 +75,11 @@ const pendingPaymentSchema = new Schema<IPendingPayment>(
       type: String,
       enum: ['pending', 'verified', 'rejected'],
       default: 'pending',
+    },
+    receipt: {
+      fileName: { type: String, trim: true },
+      contentType: { type: String, trim: true },
+      contentBase64: { type: String },
     },
   },
   { _id: false },

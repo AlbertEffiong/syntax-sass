@@ -284,6 +284,9 @@
     submitBankTransfer: function (payload) {
       return post('/api/admin/subscription/bank-transfer', payload);
     },
+    getSubscription: function () {
+      return get('/api/admin/subscription');
+    },
   };
 
   var teacher = {

@@ -68,5 +68,6 @@ router.post(
   validate(adminBankTransferSchema),
   adminController.submitBankTransfer,
 );
+router.get('/subscription', adminController.getSubscription);
 
 export default router;

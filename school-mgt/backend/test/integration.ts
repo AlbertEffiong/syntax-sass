@@ -397,8 +397,20 @@ async function main(): Promise<void> {
     const transfer = await adminA.post('/api/admin/subscription/bank-transfer', {
       reference: 'OPAY-REF-778812',
       amount: 49,
+      receipt: {
+        fileName: 'opay-receipt.pdf',
+        contentType: 'application/pdf',
+        contentBase64: 'JVBERi0xLjQK',
+      },
     });
     check('admin submits bank transfer 200', transfer.status === 200 && transfer.json?.data?.hasPendingPayment === true, transfer.json);
+    const subscriptionDetails = await adminA.get('/api/admin/subscription');
+    check(
+      'admin subscription endpoint returns persisted receipt',
+      subscriptionDetails.status === 200 && subscriptionDetails.json?.data?.pendingPayment?.receipt?.fileName === 'opay-receipt.pdf' &&
+        subscriptionDetails.json?.data?.pendingPayment?.receipt?.contentBase64 === 'JVBERi0xLjQK',
+      subscriptionDetails.json,
+    );
 
     const verifyPay = await owner.post('/api/owner/verify-payment', {
       schoolId: schoolA.json.data.id,

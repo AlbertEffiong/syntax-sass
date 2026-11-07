@@ -60,6 +60,11 @@ export const reviewAssessmentSchema = z.object({
 export const adminBankTransferSchema = z.object({
   reference: z.string().trim().min(3, 'A payment reference is required.'),
   amount: z.number().nonnegative(),
+  receipt: z.object({
+    fileName: z.string().trim().min(1).max(255),
+    contentType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']),
+    contentBase64: z.string().min(1).max(900_000).regex(/^[A-Za-z0-9+/]+={0,2}$/),
+  }).optional(),
 });
 
 export const listStudentsQuerySchema = paginationSchema.extend({

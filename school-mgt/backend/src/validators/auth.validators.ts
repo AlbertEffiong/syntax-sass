@@ -27,12 +27,13 @@ export const inviteTeacherSchema = z.object({
   subject: z.string().trim().optional(),
   classesTaught: z.number().int().min(1).max(20).optional(),
   status: z.enum(['Active', 'On Leave']).optional(),
+  initialPassword: passwordSchema.optional(),
 });
 
 export const verifyOtpSchema = z.object({
   email: emailSchema,
   otp: z.string().regex(/^\d{6}$/, 'OTP must be a 6-digit code.'),
-  password: passwordSchema,
+  password: passwordSchema.optional(),
 });
 
 export type RegisterSchoolBody = z.infer<typeof registerSchoolSchema>;
