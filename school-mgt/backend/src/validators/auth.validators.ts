@@ -4,7 +4,7 @@ import { emailSchema, passwordSchema } from './common';
 export const registerSchoolSchema = z.object({
   name: z.string().min(2, 'School name is required.').trim(),
   email: emailSchema,
-  password: passwordSchema,
+  password: passwordSchema.optional(),
   uniqueSchoolPrefix: z
     .string()
     .regex(/^[A-Za-z]{2,6}$/, 'Prefix must be 2-6 letters.')

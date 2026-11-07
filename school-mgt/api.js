@@ -236,6 +236,9 @@
     getSchool: function () {
       return get('/api/admin/school');
     },
+    updateProfile: function (payload) {
+      return patch('/api/admin/school', payload || {});
+    },
     dashboard: function () {
       return get('/api/admin/dashboard');
     },

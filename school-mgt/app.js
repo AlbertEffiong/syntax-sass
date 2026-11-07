@@ -837,7 +837,7 @@ function newSchoolModal() {
         <div class="field">
           <label for="ns-email">Admin Email</label>
           <input class="input" id="ns-email" name="adminEmail" type="email" placeholder="admin@school.edu" required />
-          <span class="hint">This email becomes the school's login ID on the School Admin portal.</span>
+          <span class="hint">This email becomes the school's login ID on the School Admin portal. A secure password is generated automatically and emailed to this address.</span>
         </div>
         <div class="field">
           <label for="ns-prefix">School Prefix (2-6 letters)</label>
@@ -1164,7 +1164,7 @@ function adminDashboard() {
             <div class="stat-icon amber" style="width:38px;height:38px;border-radius:10px">${ic.book}</div>
             <div>
               <div class="cell-strong">${esc(a.cls)} · ${esc(a.subject)}</div>
-              <div class="cell-muted">${esc(a.teacher)} · ${esc(a.term)} · submitted ${fmtDate(a.submittedAt)}</div>
+              <div class="cell-muted">${esc(a.teacher || "Teacher")} · ${esc(a.term)} · submitted ${fmtDate(a.submittedAt)}</div>
             </div>
           </div>
           <div class="row-actions">
@@ -2142,7 +2142,7 @@ function currentAssessment(cls, subject) {
     a.schoolId === sid &&
     normClass(a.cls) === normClass(cls) &&
     String(a.subject).toLowerCase() === String(subject).toLowerCase() &&
-    (a.status === "pending" || a.status === "revised")
+    (a.status === "pending" || a.status === "revised" || a.status === "approved")
   ) || null;
 }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
@@ -2206,7 +2206,8 @@ function teacherApp() {
   const rows = subj ? ensureScores(cls, subj) : [];
   const assessment = currentAssessment(cls, subj);
   const submitted = assessment && assessment.status === "pending";
-  const revised = assessment && assessment.status !== "pending";
+  const revised = assessment && assessment.status === "revised";
+  const approved = assessment && assessment.status === "approved";
 
   const tabBar = `
     <div class="seg-tabs" role="tablist" aria-label="Result entry mode">
@@ -2293,11 +2294,13 @@ function teacherApp() {
         <h1>${me ? esc(me.name) : "Score Entry"} — Broadsheet</h1>
         <div class="sub">${me ? esc(me.subject) + " · " : ""}Enter CA and exam scores, or upload a compiled sheet — totals and grades are computed automatically. Classes &amp; subjects are synced strictly to the Admin <strong>Classes &amp; Subjects</strong> curriculum.</div>
       </div>
-      <div class="page-head-actions" style="align-items:flex-start">
+<div class="page-head-actions" style="align-items:flex-start">
         ${revised ? `<span class="badge badge-expired" style="margin-top:8px"><span class="dot"></span>Revision Requested</span>` : ""}
+        ${approved ? `<span class="badge badge-active" style="margin-top:8px"><span class="dot"></span>Approved</span>` : ""}
         ${submitted ? `<button class="btn btn-ghost" data-action="teacher:submit" disabled style="opacity:.65;cursor:not-allowed">${ic.clock}<span>Pending Approval</span></button>` :
-         revised ? `<button class="btn btn-amber" data-action="teacher:submit">${ic.refresh}<span>Re-submit for Approval</span></button>` :
-         `<button class="btn btn-primary" data-action="teacher:submit">${ic.check}<span>Submit for Approval</span></button>`}
+        approved ? `<button class="btn btn-amber" data-action="teacher:submit">${ic.refresh}<span>Re-submit for Approval</span></button>` :
+        revised ? `<button class="btn btn-amber" data-action="teacher:submit">${ic.refresh}<span>Re-submit for Approval</span></button>` :
+        `<button class="btn btn-primary" data-action="teacher:submit">${ic.check}<span>Submit for Approval</span></button>`}
       </div>
     </div>
 
@@ -2334,11 +2337,11 @@ function teacherApp() {
     </div>
 
     ${assessment ? `
-    <div class="pending-banner" style="margin-top:0">
-      <div class="pending-banner-icon">${revised ? ic.alert : ic.clock}</div>
+    <div class="pending-banner ${approved ? "approved-banner" : ""}" style="margin-top:0">
+      <div class="pending-banner-icon">${revised ? ic.alert : approved ? ic.check : ic.clock}</div>
       <div style="flex:1">
-        <div class="pending-banner-title">${revised ? "Revision Requested by Principal" : "Submitted — Pending Approval"}</div>
-        <div class="pending-banner-text">${revised ? esc(assessment.note || "The Principal requested changes. Review the feedback and re-submit for approval.") : esc(assessment.cls + " · " + assessment.subject + " was submitted on " + fmtDate(assessment.submittedAt) + " and is awaiting Principal review.")}</div>
+        <div class="pending-banner-title">${revised ? "Revision Requested by Principal" : approved ? "Approved by Principal" : "Submitted — Pending Approval"}</div>
+        <div class="pending-banner-text">${revised ? esc(assessment.note || "The Principal requested changes. Review the feedback and re-submit for approval.") : approved ? esc(assessment.cls + " · " + assessment.subject + " was approved on " + fmtDate(assessment.approvedAt) + ". You may edit the scores and re-submit for approval.") : esc(assessment.cls + " · " + assessment.subject + " was submitted on " + fmtDate(assessment.submittedAt) + " and is awaiting Principal review.")}</div>
       </div>
     </div>` : ""}
 
@@ -3539,13 +3542,16 @@ document.addEventListener("submit", async (e) => {
         const res = await window.SyntaxApi.auth.registerSchool({
           name: String(data.get("name") || "").trim(),
           email: adminEmail,
-          password: DEFAULT_ADMIN_PASSWORD,
           uniqueSchoolPrefix: String(data.get("uniqueSchoolPrefix") || "").trim().toUpperCase(),
           planMonthly: Number(data.get("plan")) || 49,
         });
-        if (res && res.user) liveUpsertSchool(res.user);
+        const school = res && res.school ? res.school : res;
+        if (school) liveUpsertSchool(school);
         closeModal();
-        toast("School registered", `${String(data.get("name"))} created.`);
+        const pw = (res && res.password) ? res.password : null;
+        toast("School registered",
+          `${String(data.get("name"))} created. Credentials emailed to ${adminEmail}` +
+          (pw ? ` (dev password: ${pw})` : "") + ".");
         render();
       } catch (e) { toast("Error", e.message || "Failed", "error"); }
       return;

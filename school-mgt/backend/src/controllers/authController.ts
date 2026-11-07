@@ -10,11 +10,12 @@ import { RegisterSchoolBody, LoginBody, InviteTeacherBody, VerifyOtpBody } from 
 /**
  * POST /api/auth/register-school
  * SaaS Owner onboards a new school (creates the school admin's credentials).
+ * A secure password is generated server-side and emailed to the admin.
  */
 export const registerSchool = asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as RegisterSchoolBody;
-  const school = await authService.registerSchool(body);
-  return created(res, school, 'School registered successfully.');
+  const result = await authService.registerSchool(body);
+  return created(res, result, 'School registered successfully. Credentials emailed to the admin.');
 });
 
 /**

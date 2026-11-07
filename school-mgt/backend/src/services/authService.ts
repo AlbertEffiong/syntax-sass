@@ -6,9 +6,9 @@ import { Teacher, ITeacherDocument } from '../models/Teacher';
 import { Student, IStudentDocument } from '../models/Student';
 import { ApiError } from '../utils/ApiError';
 import { assertSameSchool } from '../utils/security';
-import { hashPassword, verifyPassword, isStrongPassword, PASSWORD_POLICY_MESSAGE } from '../utils/password';
+import { hashPassword, verifyPassword, isStrongPassword, generateStrongPassword, PASSWORD_POLICY_MESSAGE } from '../utils/password';
 import { generateOtp, verifyOtp } from '../utils/otp';
-import { sendTeacherOtpEmail } from '../utils/mailer';
+import { sendTeacherOtpEmail, sendSchoolCredentials } from '../utils/mailer';
 import { cache } from '../utils/cache';
 import { recordSchoolActivity } from '../utils/activity';
 import { env } from '../config/env';
@@ -38,7 +38,7 @@ export interface AuthenticatedResult<T> {
 export interface RegisterSchoolInput {
   name: string;
   email: string;
-  password: string;
+  password?: string;
   uniqueSchoolPrefix: string;
   principalName?: string;
   planMonthly?: number;
@@ -68,13 +68,18 @@ export interface VerifyOtpInput {
   password?: string;
 }
 
+export interface RegisterSchoolResult {
+  school: SchoolPublic;
+  /** Plaintext password — only returned outside production; in prod it is emailed. */
+  password?: string;
+}
+
 /**
  * Registers (onboards) a new school. Called exclusively by the SaaS owner.
- * The supplied credentials become the school admin's login.
+ * When no password is supplied, a cryptographically random strong password is
+ * generated and emailed to the admin — it is never stored in plaintext.
  */
-export async function registerSchool(input: RegisterSchoolInput): Promise<SchoolPublic> {
-  assertStrongPassword(input.password);
-
+export async function registerSchool(input: RegisterSchoolInput): Promise<RegisterSchoolResult> {
   const email = input.email.toLowerCase().trim();
   const prefix = input.uniqueSchoolPrefix.toUpperCase().trim();
 
@@ -89,7 +94,13 @@ export async function registerSchool(input: RegisterSchoolInput): Promise<School
     throw ApiError.conflict('This school prefix is already in use.', 'PREFIX_IN_USE');
   }
 
-  const password = await hashPassword(input.password);
+  // Generate a random admin password when the owner did not supply one. This
+  // avoids the previous behaviour of a shared hardcoded default that burned
+  // through the auth rate-limiter on every login attempt.
+  const plaintextPassword = input.password?.trim() || generateStrongPassword();
+  if (input.password) assertStrongPassword(input.password);
+
+  const password = await hashPassword(plaintextPassword);
   const school = await School.create({
     name: input.name,
     email,
@@ -102,7 +113,17 @@ export async function registerSchool(input: RegisterSchoolInput): Promise<School
       input.subscriptionExpiresAt ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   });
 
-  return serializeSchool(school);
+  // Email the credentials. Fire-and-forget: never let mail failure block the
+  // registration, but log loudly in production so the owner can re-send.
+  sendSchoolCredentials(email, input.name, email, plaintextPassword)
+    .then(() => {
+      if (env.isProduction) console.log(`[mail] School credentials sent to ${email} for ${input.name}.`);
+    })
+    .catch((err) => console.error(`[mail] Failed to send school credentials for ${email}:`, (err as Error).message));
+
+  const result: RegisterSchoolResult = { school: serializeSchool(school) };
+  if (!env.isProduction) result.password = plaintextPassword;
+  return result;
 }
 
 /**

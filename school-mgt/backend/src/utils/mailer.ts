@@ -78,3 +78,32 @@ export function sendStudentCredentials(to: string, studentId: string, password: 
     text: `Welcome to ${schoolName}.\nStudent ID: ${studentId}\nPassword: ${password}`,
   });
 }
+
+/**
+ * Email template used when the SaaS owner onboards a new school. The admin
+ * password is generated server-side and emailed — never stored in plaintext.
+ */
+export function sendSchoolCredentials(
+  to: string,
+  schoolName: string,
+  adminEmail: string,
+  password: string,
+): Promise<void> {
+  return sendMail({
+    to,
+    subject: `Your ${schoolName} admin login credentials`,
+    html:
+      `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">` +
+      `<h2 style="color:#4f46e5">Welcome to ${schoolName}</h2>` +
+      `<p>A new school has been registered on Syntax SaaS. Use these credentials to sign in to the School Admin portal.</p>` +
+      `<ul><li>School: ${schoolName}</li><li>Admin Email: ${adminEmail}</li><li>Password: ${password}</li></ul>` +
+      `<p style="color:#b45309"><strong>Keep this password safe.</strong> You will be asked to change it on first sign-in.</p></div>`,
+    text:
+      `Welcome to ${schoolName}.\n\n` +
+      `A new school has been registered on Syntax SaaS.\n` +
+      `School: ${schoolName}\n` +
+      `Admin Email: ${adminEmail}\n` +
+      `Password: ${password}\n\n` +
+      `Keep this password safe. You will be asked to change it on first sign-in.`,
+  });
+}

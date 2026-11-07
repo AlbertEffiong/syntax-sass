@@ -804,6 +804,20 @@ code {
   margin-top: 10px;
 }
 
+/* Approved assessment banner (green) */
+.pending-banner.approved-banner {
+  border-color: #bbf7d0;
+  background: var(--green-bg);
+}
+.pending-banner.approved-banner .pending-banner-icon {
+  background: #fff;
+  color: var(--green);
+}
+.pending-banner.approved-banner .pending-banner-title,
+.pending-banner.approved-banner .pending-banner-text {
+  color: #166534;
+}
+
 /* ============ Extra button / badge helpers ============ */
 .badge-amber { background: var(--amber-bg); color: var(--amber); }
 .btn-danger { background: var(--red-bg); color: var(--red); border-color: transparent; }
