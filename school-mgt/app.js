@@ -2715,7 +2715,7 @@ document.addEventListener("focusout", () => { if (tipSrc) tipHide(); });
 /* ============================================================
    Event handling
    ============================================================ */
-document.addEventListener("click", (e) => {
+document.addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-action]");
   if (!btn) return;
   const action = btn.getAttribute("data-action");
@@ -3923,7 +3923,7 @@ document.addEventListener("submit", async (e) => {
 });
 
 /* Demo controls */
-document.addEventListener("click", (e) => {
+document.addEventListener("click", async (e) => {
   const el = e.target.closest('[data-action="demo:expire"]');
   if (el) {
     if (!state.auth.tier) return;
