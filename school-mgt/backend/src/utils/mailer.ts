@@ -45,13 +45,23 @@ export async function sendMail(message: MailMessage): Promise<void> {
 /**
  * Convenience template for teacher invitation OTPs.
  */
-export function sendTeacherOtpEmail(to: string, otp: string, schoolName: string): Promise<void> {
+export function sendTeacherOtpEmail(to: string, otp: string, schoolName: string, password?: string): Promise<void> {
+  const creds = password ? `\nSign-in email: ${to}\nPassword: ${password}\n` : '';
   return sendMail({
     to,
     subject: 'Your Syntax SaaS teacher activation code',
+    html:
+      `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">` +
+      `<h2 style="color:#4f46e5">Welcome to ${schoolName}</h2>` +
+      `<p>You have been invited to join <strong>${schoolName}</strong> on Syntax SaaS.</p>` +
+      `<p><strong>Your login details:</strong></p>` +
+      `<ul><li>Email: ${to}</li>${password ? `<li>Password: ${password}</li>` : ''}</ul>` +
+      `<p><strong>Activation code:</strong> <span style="font-size:20px;letter-spacing:4px">${otp}</span></p>` +
+      `<p>This code expires in 10 minutes.</p></div>`,
     text:
       `You have been invited to join ${schoolName} on Syntax SaaS.\n\n` +
-      `Your activation code is: ${otp}\n` +
+      `Login details:\nEmail: ${to}\n${password ? `Password: ${password}\n` : ''}` +
+      `Activation code: ${otp}\n` +
       `This code expires in 10 minutes.`,
   });
 }

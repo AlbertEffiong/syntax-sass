@@ -257,7 +257,7 @@ export async function inviteTeacher(input: InviteTeacherInput): Promise<InviteTe
   });
 
   const school = await School.findById(input.schoolId);
-  await sendTeacherOtpEmail(email, code, school?.name ?? 'your school');
+  await sendTeacherOtpEmail(email, code, school?.name ?? 'your school', input.initialPassword);
   await cache.invalidatePrefix(`teachers:${input.schoolId}:`);
   await recordSchoolActivity(input.schoolId, 'teacher.invited', 'Teacher invited', `${teacher.name} (${teacher.email}) was invited to the school.`);
 

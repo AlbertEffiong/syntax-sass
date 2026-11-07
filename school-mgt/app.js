@@ -3562,6 +3562,7 @@ document.addEventListener("submit", async (e) => {
         state.auth.teacher = { loggedIn: true, teacherId: teacher.id, email: teacher.email };
         await liveLoadTeacherData();
         saveSession();
+        closeModal();
         toast("Account activated", `Welcome, ${teacher.name}. You are now signed in.`, "success");
         render();
       } catch (err) {
