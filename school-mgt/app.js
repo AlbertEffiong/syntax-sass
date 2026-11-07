@@ -95,6 +95,12 @@ const state = {
     { id: "CLS2", schoolId: 1, name: "SS 3 Science", teacher: "Mr. F. Danjuma", subjects: ["Physics", "Chemistry", "Biology", "Further Mathematics", "Mathematics"], students: 0 },
   ]),
   fees: { collected: 12450, pending: 3180, expected: 15630 },
+  recentActivity: [
+    { type: "assessment.submitted", title: "Mr. C. Okafor submitted JSS2 Mathematics scores", details: "CA1 + CA2 + Exam for 31 students.", createdAt: new Date(Date.now() - 12 * 60 * 1000).toISOString() },
+    { type: "fee.payment", title: "Fee payment received", details: "₦180 received from Blessing Uche (SS2).", createdAt: new Date(Date.now() - 48 * 60 * 1000).toISOString() },
+    { type: "student.enrolled", title: "Student enrolled", details: "New student enrolled into SS1.", createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+    { type: "assessment.reviewed", title: "Result approval pending for JSS3 Basic Science", details: "Awaiting your review.", createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString() },
+  ],
   assessments: [
     { id: "ASM-1001", schoolId: 1, teacherId: "TCH4", teacher: "Mr. F. Danjuma", cls: "SS1", subject: "Physics", term: "First Term", submittedAt: "2026-10-09", status: "pending", note: "" },
     { id: "ASM-1002", schoolId: 1, teacherId: "TCH2", teacher: "Mr. C. Okafor", cls: "JSS2", subject: "English Language", term: "First Term", submittedAt: "2026-10-09", status: "pending", note: "" },
@@ -425,6 +431,59 @@ function openModal(html) {
 function closeModal() {
   $("#modal-root").innerHTML = "";
   document.body.style.overflow = "";
+}
+
+/* ----------------------------- Activity rendering ----------------------------- */
+const ACTIVITY_ICON = {
+  "student.enrolled": ic.users,
+  "student.updated": ic.edit,
+  "student.removed": ic.users,
+  "fee.payment": ic.wallet,
+  "teacher.invited": ic.userCheck,
+  "teacher.verified": ic.userCheck,
+  "teacher.updated": ic.edit,
+  "teacher.removed": ic.userCheck,
+  "class.created": ic.book,
+  "class.updated": ic.book,
+  "class.removed": ic.book,
+  "assessment.submitted": ic.book,
+  "assessment.reviewed": ic.book,
+  "subscription.payment_submitted": ic.card,
+};
+const ACTIVITY_TONE = {
+  "student.enrolled": "purple",
+  "student.updated": "blue",
+  "fee.payment": "green",
+  "teacher.invited": "purple",
+  "teacher.verified": "green",
+  "teacher.updated": "blue",
+  "teacher.removed": "red",
+  "class.created": "blue",
+  "class.updated": "blue",
+  "class.removed": "red",
+  "assessment.submitted": "blue",
+  "assessment.reviewed": "amber",
+  "subscription.payment_submitted": "green",
+};
+function activityIcon(type) { return ACTIVITY_ICON[type] || ic.bell; }
+function activityTone(type) { return ACTIVITY_TONE[type] || "blue"; }
+
+/**
+ * Records a school activity entry. In LIVE_API mode the backend already
+ * persists it (and `recentActivity` is re-fetched on dashboard load); in demo
+ * mode we keep a local feed so the Recent Activity card reflects real actions.
+ */
+function recordActivity(type, title, details) {
+  const entry = { type, title, details, createdAt: new Date().toISOString() };
+  if (LIVE_API) {
+    state.recentActivity = state.recentActivity || [];
+    state.recentActivity.unshift(entry);
+    if (state.recentActivity.length > 8) state.recentActivity.length = 8;
+    return;
+  }
+  state.recentActivity = state.recentActivity || [];
+  state.recentActivity.unshift(entry);
+  if (state.recentActivity.length > 8) state.recentActivity.length = 8;
 }
 
 /* ----------------------------- Top bar ----------------------------- */
@@ -977,12 +1036,20 @@ function adminDashboard() {
   const pct = state.fees.expected ? Math.round((collected / state.fees.expected) * 100) : 0;
   const debtors = state.students.filter((st) => st.schoolId === state.school.id && st.due > 0).length;
 
-  const activity = [
-    { t: "Mr. C. Okafor submitted JSS2 Mathematics scores", w: "12 min ago", icon: ic.book, cls: "blue" },
-    { t: `Fees payment received — ${money(180)} from Blessing Uche`, w: "48 min ago", icon: ic.wallet, cls: "green" },
-    { t: "New student enrolled into SS1", w: "2 hours ago", icon: ic.users, cls: "purple" },
-    { t: "Result approval pending for JSS3 Basic Science", w: "5 hours ago", icon: ic.clock, cls: "amber" },
-  ];
+  const activity = state.recentActivity || [];
+
+  const activityRows = activity.length ? activity.map((a) => {
+    const icon = activityIcon(a.type);
+    const cls = activityTone(a.type);
+    return `
+      <div class="list-row">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="stat-icon ${cls}" style="width:38px;height:38px;border-radius:10px">${icon}</div>
+          <div style="font-size:13.5px" class="cell-strong">${esc(a.title)}${a.details ? `<br><span class="cell-muted" style="font-size:12px">${esc(a.details)}</span>` : ""}</div>
+        </div>
+        <span class="cell-muted">${fmtDate(a.createdAt)}</span>
+      </div>`;
+  }).join("") : `<div class="cell-muted" style="padding:22px;text-align:center">No recent activity yet.</div>`;
 
   return `
     ${graceBanner()}
@@ -1058,14 +1125,7 @@ function adminDashboard() {
 
     <div class="card" style="margin-top:20px">
       <div class="card-head" style="padding:0 0 8px;border-bottom:0"><div><h3>Recent Activity</h3><div class="hint">Latest actions across your school</div></div></div>
-      ${activity.map((a) => `
-        <div class="list-row">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div class="stat-icon ${a.cls}" style="width:38px;height:38px;border-radius:10px">${a.icon}</div>
-            <div style="font-size:13.5px" class="cell-strong">${esc(a.t)}</div>
-          </div>
-          <span class="cell-muted">${a.w}</span>
-        </div>`).join("")}
+      ${activityRows}
     </div>
   `;
 }
@@ -1667,15 +1727,23 @@ function inviteTeacherModal() {
 }
 
 function teacherInviteCredentialsModal(teacher, password) {
+  const otp = teacher.otp || "";
   openModal(`
     <div class="modal-head">
-      <div><h3>Teacher Invited</h3><div class="sub">The verification code was sent to ${esc(teacher.email)}.</div></div>
+      <div><h3>Teacher Invited</h3><div class="sub">Share these credentials with the new staff member.</div></div>
       <button class="close-x" data-action="modal:close">${ic.x}</button>
     </div>
     <div class="modal-body">
       <div class="field"><label>Sign-in Email</label><input class="input" value="${esc(teacher.email)}" readonly /></div>
       <div class="field"><label>Generated Password</label><input class="input code" value="${esc(password)}" readonly /></div>
-      <div class="demo-note">Share these credentials with the teacher. They sign in on the Teacher portal, then enter the OTP from their email to activate the account. Once verified, every future sign-in uses the same password — no OTP is required again.</div>
+      ${otp ? `
+        <div class="field">
+          <label>Activation OTP (dev)</label>
+          <input class="input code" value="${esc(otp)}" readonly />
+          <span class="hint">In development the OTP is shown here. In production it is emailed to the teacher. The teacher signs in with the email + password above, then enters this 6-digit code to activate the account.</span>
+        </div>` : `
+        <div class="demo-note">In production the OTP is emailed to the teacher. The teacher signs in with the email + password above, then enters the 6-digit code from their email to activate the account.</div>`}
+      <div class="demo-note" style="margin-top:12px">Once verified, every future sign-in uses the same password — no OTP is required again.</div>
     </div>
     <div class="modal-foot"><button class="btn btn-primary" data-action="modal:close">Done</button></div>
   `);
@@ -2773,6 +2841,7 @@ document.addEventListener("click", (e) => {
     case "student:confirmDelete": {
       const st = state.students.find((s) => s.id === rawId);
       state.students = state.students.filter((s) => s.id !== rawId);
+      recordActivity("student.removed", "Student removed", `${st ? st.name : "A student"} (${st ? st.id : ""}) was removed from the register.`);
       closeModal();
       toast("Student deleted", st ? st.name + " removed." : "", "error");
       render();
@@ -2810,6 +2879,7 @@ document.addEventListener("click", (e) => {
       if (!t) break;
       const finish = () => {
         state.teachers = state.teachers.filter((x) => x.id !== rawId);
+        recordActivity("teacher.removed", "Teacher removed", `${t.name} (${t.email}) was removed from the staff register.`);
         closeModal();
         toast("Teacher deleted", `${t.name} removed.`, "error");
         render();
@@ -3066,6 +3136,7 @@ document.addEventListener("click", (e) => {
       if (cur) {
         cur.status = "pending"; cur.submittedAt = todayISO(); cur.note = "";
         cur.principal = principalName(state.school);
+        recordActivity("assessment.submitted", "Assessment resubmitted", `${cls} · ${subj} resubmitted for approval.`);
         toast("Re-submitted for approval", `${cls} · ${subj} was sent back to the Principal as Pending Approval.`);
       } else {
         state.assessments.unshift({
@@ -3078,6 +3149,7 @@ document.addEventListener("click", (e) => {
           principal: principalName(state.school),
           submittedAt: todayISO(), status: "pending", note: "",
         });
+        recordActivity("assessment.submitted", "Assessment submitted", `${cls} · ${subj} scores submitted for approval.`);
         toast("Submitted for approval", `${cls} · ${subj} scores sent to the Principal.`);
       }
       render();
@@ -3110,7 +3182,9 @@ document.addEventListener("click", (e) => {
       break;
     }
     case "class:confirmDelete": {
+      const c = state.classes.find((x) => x.id === rawId);
       state.classes = state.classes.filter((x) => x.id !== rawId);
+      recordActivity("teacher.removed", "Class removed", `${c ? c.name : "A class"} was removed from the curriculum.`);
       closeModal();
       toast("Class deleted", "The class and its subject mapping were removed.", "error");
       render();
@@ -3119,11 +3193,23 @@ document.addEventListener("click", (e) => {
 
     case "assess:approve": {
       const a = state.assessments.find((x) => x.id === rawId);
-      if (a) {
-        a.status = "approved"; a.approvedAt = todayISO(); a.note = "";
-        toast("Assessment approved", `${a.cls} · ${a.subject} grades are now published to report cards.`, "success");
+      if (!a) break;
+      if (LIVE_API) {
+        try {
+          await SyntaxApi.admin.reviewAssessment({ assessmentId: a.dbId || a.id, action: "approve" });
+          a.status = "approved"; a.approvedAt = todayISO(); a.note = "";
+          recordActivity("assessment.reviewed", "Assessment approved", `${a.cls} · ${a.subject} grades published to report cards.`);
+          toast("Assessment approved", `${a.cls} · ${a.subject} grades are now published to report cards.`, "success");
+        } catch (err) {
+          toast("Approval failed", err.message || "Could not approve this assessment.", "error");
+        }
         render();
+        break;
       }
+      a.status = "approved"; a.approvedAt = todayISO(); a.note = "";
+      recordActivity("assessment.reviewed", "Assessment approved", `${a.cls} · ${a.subject} grades published to report cards.`);
+      toast("Assessment approved", `${a.cls} · ${a.subject} grades are now published to report cards.`, "success");
+      render();
       break;
     }
     case "assess:revise": {
@@ -3454,6 +3540,7 @@ document.addEventListener("submit", async (e) => {
     };
     teacher.subject = teacher.subjects.join(", ");
     state.teachers.unshift(teacher);
+    recordActivity("teacher.invited", "Teacher invited", `${name} (${email}) was invited to the school.`);
     toast("Invite sent", `OTP sent to ${email}.`);
     teacherInviteCredentialsModal(teacher, initialPassword);
     render();
@@ -3596,6 +3683,7 @@ document.addEventListener("submit", async (e) => {
     if (sid) {
       const st = state.students.find((s) => s.id === sid);
       if (st) Object.assign(st, bio);
+      recordActivity("student.updated", "Student record updated", `${name} (${st ? st.id : ""}) record was updated.`);
       toast("Student updated", `${name}'s record has been saved.`);
     } else {
       const gen = nextStudentId(state.school.id);
@@ -3608,6 +3696,7 @@ document.addEventListener("submit", async (e) => {
       };
       record.history = buildHistory(record);
       state.students.unshift(record);
+      recordActivity("student.enrolled", "Student enrolled", `${name} enrolled in ${cls} · ID ${gen.id}.`);
       toast("Student enrolled", `${name} added to ${cls} · ID ${gen.id}. Credentials generated.`);
     }
     closeModal();
@@ -3686,9 +3775,10 @@ document.addEventListener("submit", async (e) => {
         return;
       }
       const c = state.classes.find((x) => x.id === id);
-      if (c) { Object.assign(c, { name, teacher, subjects }); toast("Class updated", `${name} and its subjects were saved.`); }
+      if (c) { Object.assign(c, { name, teacher, subjects }); recordActivity("class.updated", "Class updated", `${name} curriculum was updated.`); toast("Class updated", `${name} and its subjects were saved.`); }
     } else {
       state.classes.push({ id: "CLS" + Date.now().toString().slice(-6), schoolId: state.school.id, name, teacher, subjects, students: 0 });
+      recordActivity("class.created", "Class created", `${name} added to the curriculum with ${subjects.length} subjects.`);
       toast("Class created", `${name} added to the curriculum with ${subjects.length} subjects.`, "success");
     }
     closeModal();
@@ -3700,6 +3790,7 @@ document.addEventListener("submit", async (e) => {
     if (a) {
       const note = String(new FormData(form).get("note") || "").trim();
       a.status = "revised"; a.note = note || "Revision requested by the Principal."; a.revisedAt = todayISO();
+      recordActivity("assessment.reviewed", "Revision requested", `${a.cls} · ${a.subject} sent back to ${a.teacher}.`);
       toast("Revision requested", `Feedback sent to ${a.teacher} for ${a.cls} · ${a.subject}.`);
       render();
     }
@@ -3789,9 +3880,11 @@ document.addEventListener("submit", async (e) => {
         return;
       }
       if (t) Object.assign(t, record);
+      recordActivity("teacher.updated", "Teacher profile updated", `${name}'s profile was updated.`);
       toast("Teacher updated", `${name}'s record has been saved.`);
     } else {
       state.teachers.unshift({ id: "TCH" + Date.now().toString().slice(-6), ...record });
+      recordActivity("teacher.invited", "Teacher added", `${name} added to the teaching staff.`);
       toast("Teacher added", `${name} added to the teaching staff.`);
     }
     closeModal();
@@ -3822,6 +3915,7 @@ document.addEventListener("submit", async (e) => {
     state.fees.collected += amount;
     state.fees.pending = Math.max(0, state.fees.pending - amount);
     state.fees.expected = state.fees.collected + state.fees.pending;
+    recordActivity("fee.payment", "Fee payment recorded", `${money(amount)} received from ${st.name}.`);
     closeModal();
     toast("Payment recorded", `${money(amount)} received from ${st.name}.`);
     render();
@@ -3988,6 +4082,7 @@ async function liveLoadAdminData() {
   state.school.students = dashboard.studentCount || 0;
   state.school.teacherCount = dashboard.teacherCount || 0;
   state.school.pendingAssessmentCount = dashboard.pendingAssessmentCount || 0;
+  state.recentActivity = Array.isArray(dashboard.recentActivity) ? dashboard.recentActivity : [];
   liveUpsertSchool(schoolData);
   state.school = schoolById(schoolId);
 }

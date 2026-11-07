@@ -3,6 +3,7 @@ import { Document, Model, Schema, Types, model } from 'mongoose';
 export type SchoolActivityType =
   | 'student.enrolled'
   | 'student.updated'
+  | 'student.removed'
   | 'fee.payment'
   | 'teacher.invited'
   | 'teacher.verified'
@@ -10,6 +11,7 @@ export type SchoolActivityType =
   | 'teacher.removed'
   | 'class.created'
   | 'class.updated'
+  | 'class.removed'
   | 'assessment.submitted'
   | 'assessment.reviewed'
   | 'subscription.payment_submitted';
