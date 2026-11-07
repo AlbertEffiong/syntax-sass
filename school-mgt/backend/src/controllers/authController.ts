@@ -3,6 +3,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { created, ok } from '../utils/response';
 import { establishSession, clearSession } from '../utils/session';
 import { ApiError } from '../utils/ApiError';
+import { signToken } from '../utils/jwt';
 import * as authService from '../services/authService';
 import { RegisterSchoolBody, LoginBody, InviteTeacherBody, VerifyOtpBody } from '../validators/auth.validators';
 
@@ -60,7 +61,13 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
     throw ApiError.unauthorized();
   }
-  return ok(res, { user: req.user });
+  const token = signToken({
+    sub: req.user.id,
+    role: req.user.role,
+    schoolId: req.user.schoolId,
+    email: req.user.email,
+  });
+  return ok(res, { user: req.user, token });
 });
 
 /**

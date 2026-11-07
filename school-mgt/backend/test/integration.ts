@@ -127,6 +127,12 @@ async function main(): Promise<void> {
       password: ownerPassword,
     });
     check('owner login 200', ownerLogin.status === 200, ownerLogin.json);
+    const restoredOwnerSession = await owner.get('/api/auth/me');
+    check(
+      'authenticated session restore returns bearer token',
+      restoredOwnerSession.status === 200 && typeof restoredOwnerSession.json?.data?.token === 'string',
+      restoredOwnerSession.json,
+    );
 
     // Weak password should be rejected by the policy.
     const weak = await owner.post('/api/auth/register-school', {

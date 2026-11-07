@@ -96,6 +96,18 @@
   /** Core request. Returns `data` from the envelope, or throws ApiError. */
   function request(method, path, body, options) {
     options = options || {};
+    var unsafe = ['POST', 'PUT', 'PATCH', 'DELETE'].indexOf(method) !== -1;
+
+    if (cfg.authMode === 'bearer' && unsafe && !bearerToken && path !== '/api/auth/me') {
+      return request('GET', '/api/auth/me', undefined, { skipBearer: true }).then(function (session) {
+        if (!session || !session.token) {
+          throw new ApiError('Your session expired. Sign in again before making changes.', 401, 'SESSION_EXPIRED');
+        }
+        storeToken(session.token);
+        return request(method, path, body, options);
+      });
+    }
+
     var headers = {};
     if (options.headers) {
       for (var h in options.headers) {
@@ -104,13 +116,11 @@
     }
     if (body !== undefined) headers['Content-Type'] = 'application/json';
 
-    var unsafe = ['POST', 'PUT', 'PATCH', 'DELETE'].indexOf(method) !== -1;
-
-    var usingBearer = cfg.authMode === 'bearer' && !!bearerToken;
+    var usingBearer = cfg.authMode === 'bearer' && !!bearerToken && !options.skipBearer;
     if (usingBearer) {
       headers['Authorization'] = 'Bearer ' + bearerToken;
     }
-    if (!usingBearer && unsafe) {
+    if (cfg.authMode === 'cookie' && unsafe) {
       var csrf = getCookie('csrfToken');
       if (csrf) headers['x-csrf-token'] = csrf;
     }
@@ -187,7 +197,7 @@
       return post('/api/auth/verify-otp', payload);
     },
     me: function () {
-      return get('/api/auth/me');
+      return get('/api/auth/me').then(captureToken);
     },
     logout: function () {
       return post('/api/auth/logout').catch(function () {}).then(function () {
