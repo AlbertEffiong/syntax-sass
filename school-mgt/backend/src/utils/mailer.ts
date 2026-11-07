@@ -65,3 +65,17 @@ export function sendTeacherOtpEmail(to: string, otp: string, schoolName: string,
       `This code expires in 10 minutes.`,
   });
 }
+
+
+export function sendStudentCredentials(to: string, studentId: string, password: string, schoolName: string): Promise<void> {
+  return sendMail({
+    to,
+    subject: `Your ${schoolName} student login details`,
+    html:
+      `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">` +
+      `<h2 style="color:#4f46e5">Welcome to ${schoolName}</h2>` +
+      `<p>Your student account has been created.</p>` +
+      `<ul><li>Student ID: ${studentId}</li><li>Password: ${password}</li></ul></div>`,
+    text: `Welcome to ${schoolName}.\nStudent ID: ${studentId}\nPassword: ${password}`,
+  });
+}

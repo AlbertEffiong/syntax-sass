@@ -6,6 +6,7 @@ import { Teacher } from '../models/Teacher';
 import { Assessment, AssessmentStatus } from '../models/Assessment';
 import { SchoolActivity } from '../models/SchoolActivity';
 import { ApiError } from '../utils/ApiError';
+import { sendStudentCredentials } from '../utils/mailer';
 import { assertSameSchool } from '../utils/security';
 import { generateStudentId } from '../utils/studentId';
 import { hashPassword } from '../utils/password';
@@ -214,6 +215,7 @@ export async function enrollStudent(input: EnrollStudentInput): Promise<StudentP
   });
 
   await cache.invalidatePrefix(`students:${input.schoolId}:`);
+  if (input.contact && input.contact.includes('@')) await sendStudentCredentials(input.contact, studentId, input.password, (await School.findById(input.schoolId))?.name ?? 'your school');
   await recordSchoolActivity(input.schoolId, 'student.enrolled', 'Student enrolled', `${student.fullName} enrolled in ${student.currentClass}.`);
   return serializeStudent(student);
 }
