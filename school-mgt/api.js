@@ -97,8 +97,13 @@
   function request(method, path, body, options) {
     options = options || {};
     var unsafe = ['POST', 'PUT', 'PATCH', 'DELETE'].indexOf(method) !== -1;
+    var sessionBootstrapPath = [
+      '/api/auth/login',
+      '/api/auth/verify-otp',
+      '/api/student/login',
+    ].indexOf(path) !== -1;
 
-    if (cfg.authMode === 'bearer' && unsafe && !bearerToken && path !== '/api/auth/me') {
+    if (cfg.authMode === 'bearer' && unsafe && !bearerToken && !sessionBootstrapPath && path !== '/api/auth/me') {
       return request('GET', '/api/auth/me', undefined, { skipBearer: true }).then(function (session) {
         if (!session || !session.token) {
           throw new ApiError('Your session expired. Sign in again before making changes.', 401, 'SESSION_EXPIRED');
