@@ -382,13 +382,20 @@ function restoreSession() {
 
 const STATUS_META = {
   active: { label: "Active", cls: "badge-active" },
-  grace: { label: "3-Day Grace Period", cls: "badge-grace" },
+  grace: { label: "Grace Period", cls: "badge-grace" },
   expired: { label: "Expired", cls: "badge-expired" },
   locked: { label: "Locked", cls: "badge-locked" },
 };
 function statusBadge(status) {
-  const m = STATUS_META[status] || STATUS_META.active;
-  return `<span class="badge ${m.cls}"><span class="dot"></span>${m.label}</span>`;
+  if (typeof status === "object" && status && status.cls) {
+    return `<span class="badge ${status.cls}"><span class="dot"></span>${status.label}</span>`;
+  }
+  const st = STATUS_META[status] || STATUS_META.active;
+  return `<span class="badge ${st.cls}"><span class="dot"></span>${st.label}</span>`;
+}
+
+function subscriptionBadge(school) {
+  return statusBadge(subscriptionState(school));
 }
 
 function gradeFor(total) {
@@ -986,6 +993,7 @@ const ADMIN_NAV = [
 
 function adminApp() {
   const s = state.school;
+  const sub = subscriptionState(s);
   const body = {
     dashboard: adminDashboard,
     students: adminStudents,
@@ -993,6 +1001,7 @@ function adminApp() {
     classes: adminClasses,
     fees: adminFees,
     subscription: adminSubscription,
+    profile: adminProfile,
   }[state.adminSection]();
 
   return `
@@ -1001,7 +1010,7 @@ function adminApp() {
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-brand">
         <div class="name">${esc(s.name)}</div>
-        <div class="meta">Administrator · ${statusBadge(s.status).replace(/<span class="dot"><\/span>/, "")}</div>
+        <div class="meta">Administrator · <span class="badge ${sub.cls}"><span class="dot"></span>${sub.label}</span></div>
       </div>
       <div class="nav-label">Main Menu</div>
       <nav class="sidebar-nav">
@@ -1013,6 +1022,7 @@ function adminApp() {
       </nav>
       <div class="nav-label">Account</div>
       <div class="sidebar-nav">
+        <button class="nav-item ${state.adminSection === "profile" ? "active" : ""}" data-action="admin:nav" data-section="profile">${ic.userCheck}<span>My Profile</span></button>
         <button class="nav-item" data-action="demo:expire">${ic.alert}<span>Simulate Expiry</span></button>
         <button class="nav-item" data-action="auth:logout">${ic.logout}<span>Sign Out</span></button>
       </div>
@@ -1021,13 +1031,55 @@ function adminApp() {
   </div>`;
 }
 
+function isSubscriptionActive(school) {
+  if (!school) return false;
+  if (school.status !== "active" && school.status !== "Active") return false;
+  if (!school.renewal) return false;
+  return new Date(school.renewal).getTime() > Date.now();
+}
+
+function daysUntilRenewal(school) {
+  if (!school || !school.renewal) return 0;
+  const diff = new Date(school.renewal).getTime() - Date.now();
+  return Math.ceil(diff / (24 * 60 * 60 * 1000));
+}
+
+function subscriptionState(school) {
+  if (!school) return { state: "unknown", label: "Unknown", cls: "badge-locked" };
+  const status = String(school.status || "").toLowerCase();
+  if (status === "expired" || status === "locked") {
+    return { state: "expired", label: "Expired", cls: "badge-expired" };
+  }
+  if (status === "grace") {
+    return { state: "grace", label: "3-Day Grace Period", cls: "badge-grace" };
+  }
+  const days = daysUntilRenewal(school);
+  if (days <= 0) {
+    return { state: "expired", label: "Expired", cls: "badge-expired" };
+  }
+  if (days <= 3) {
+    return { state: "grace", label: `${days}-Day Grace Period`, cls: "badge-grace" };
+  }
+  return { state: "active", label: "Active", cls: "badge-active" };
+}
+
 function graceBanner() {
-  if (state.school.status !== "grace") return "";
-  return `<div class="card" style="border-color:#fde68a;background:var(--amber-bg);display:flex;gap:12px;align-items:center;margin-bottom:20px">
-    <span style="color:var(--amber)">${ic.alert}</span>
-    <div style="font-size:13.5px;color:var(--amber)"><strong>Grace period active.</strong> Your subscription expires in 3 days. Renew to avoid losing access on ${fmtDate(state.school.renewal)}.</div>
-    <button class="btn btn-amber btn-sm" data-action="admin:nav" data-section="subscription" style="margin-left:auto">Renew</button>
-  </div>`;
+  const st = subscriptionState(state.school);
+  if (st.state === "grace") {
+    return `<div class="card" style="border-color:#fde68a;background:var(--amber-bg);display:flex;gap:12px;align-items:center;margin-bottom:20px">
+      <span style="color:var(--amber)">${ic.alert}</span>
+      <div style="font-size:13.5px;color:var(--amber)"><strong>Grace period active.</strong> Your subscription expires in ${daysUntilRenewal(state.school)} day${daysUntilRenewal(state.school) === 1 ? "" : "s"}. Renew to avoid losing access on ${fmtDate(state.school.renewal)}.</div>
+      <button class="btn btn-amber btn-sm" data-action="admin:nav" data-section="subscription" style="margin-left:auto">Renew</button>
+    </div>`;
+  }
+  if (st.state === "expired") {
+    return `<div class="card" style="border-color:#fecaca;background:var(--red-bg);display:flex;gap:12px;align-items:center;margin-bottom:20px">
+      <span style="color:var(--red)">${ic.alert}</span>
+      <div style="font-size:13.5px;color:var(--red)"><strong>Subscription expired.</strong> Your portal is locked. Renew via bank transfer to restore full access.</div>
+      <button class="btn btn-red btn-sm" data-action="admin:nav" data-section="subscription" style="margin-left:auto">Renew</button>
+    </div>`;
+  }
+  return "";
 }
 
 function adminDashboard() {
@@ -1883,12 +1935,26 @@ function adminFees() {
 
 function adminSubscription() {
   const s = state.school;
+  const sub = subscriptionState(s);
   const pend = s.pendingPayment;
+  const daysLeft = daysUntilRenewal(s);
   return `
     <div class="page-head">
       <div><h1>Subscription Status</h1><div class="sub">Your plan, renewal and billing preferences.</div></div>
-      <div class="page-head-actions">${statusBadge(s.status)}</div>
+      <div class="page-head-actions">${subscriptionBadge(s)}</div>
     </div>
+    ${sub.state === "grace" ? `
+    <div class="card" style="border-color:#fde68a;background:var(--amber-bg);display:flex;gap:12px;align-items:center;margin-bottom:20px">
+      <span style="color:var(--amber)">${ic.alert}</span>
+      <div style="font-size:13.5px;color:var(--amber)"><strong>Grace period active.</strong> Your subscription expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}. Renew to avoid losing access on ${fmtDate(s.renewal)}.</div>
+      <button class="btn btn-amber btn-sm" data-action="admin:nav" data-section="subscription" style="margin-left:auto">Renew</button>
+    </div>` : ""}
+    ${sub.state === "expired" ? `
+    <div class="card" style="border-color:#fecaca;background:var(--red-bg);display:flex;gap:12px;align-items:center;margin-bottom:20px">
+      <span style="color:var(--red)">${ic.alert}</span>
+      <div style="font-size:13.5px;color:var(--red)"><strong>Subscription expired.</strong> Your portal is locked. Renew via bank transfer to restore full access.</div>
+      <button class="btn btn-red btn-sm" data-action="admin:nav" data-section="subscription" style="margin-left:auto">Renew</button>
+    </div>` : ""}
     ${pend ? `
     <div class="pending-banner">
       <div class="pending-banner-icon">${ic.clock}</div>
@@ -1907,8 +1973,8 @@ function adminSubscription() {
             <div class="cell-muted">${money(s.plan)} billed monthly</div>
           </div>
         </div>
-        <div class="list-row"><span class="cell-muted">Status</span>${statusBadge(s.status)}</div>
-        <div class="list-row"><span class="cell-muted">Next Renewal</span><strong>${fmtDate(s.renewal)}</strong></div>
+        <div class="list-row"><span class="cell-muted">Status</span>${subscriptionBadge(s)}</div>
+        <div class="list-row"><span class="cell-muted">Next Renewal</span><strong>${fmtDate(s.renewal)}</strong><span class="cell-muted" style="margin-left:8px">${daysLeft > 0 ? `(${daysLeft} day${daysLeft === 1 ? "" : "s"} left)` : "(expired)"}</span></div>
         <div class="list-row"><span class="cell-muted">Students Licensed</span><strong>${s.students}</strong></div>
         <div class="list-row"><span class="cell-muted">Payment Method</span><strong>${pend ? "Bank Transfer (Pending)" : "Bank Transfer · OPay"}</strong></div>
       </div>
@@ -1920,6 +1986,66 @@ function adminSubscription() {
         <button class="btn btn-primary btn-block" data-action="bank:renew" style="margin-bottom:10px">${ic.card}<span>Make Bank Transfer / Renew — ${money(s.plan)}/mo</span></button>
         ${LIVE_API ? "" : `<button class="btn btn-ghost btn-block" data-action="demo:expire">${ic.alert}<span>Simulate Expiry</span></button>`}`}
         ${pend ? "" : `<div class="demo-note" style="margin-top:16px">Renewal is by <strong>bank transfer only</strong>. Pay via <strong>${BANK_DETAILS.bank}</strong> (${BANK_DETAILS.accountNumber}) and confirm here — the owner verifies and unlocks your portal.</div>`}
+      </div>
+    </div>`;
+}
+
+function adminProfile() {
+  const s = state.school;
+  const sub = subscriptionState(s);
+  const adminEmail = s.adminEmail || "";
+  const principal = s.principalName || "";
+  return `
+    <div class="page-head">
+      <div><h1>My Profile</h1><div class="sub">Manage your school admin account and sign-in credentials.</div></div>
+      <div class="page-head-actions">${subscriptionBadge(s)}</div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <h3 style="margin-bottom:14px">Account Overview</h3>
+        <div class="profile-hero" style="margin-bottom:18px">
+          <div class="profile-avatar">${initials(principal || s.name)}</div>
+          <div style="flex:1">
+            <div class="profile-name">${esc(principal || s.name)}</div>
+            <div class="cell-muted">${esc(adminEmail)}</div>
+            <div class="cell-muted" style="font-size:12px">School Administrator · ${esc(s.name)}</div>
+          </div>
+        </div>
+        <div class="list-row"><span class="cell-muted">Role</span><strong>School Administrator</strong></div>
+        <div class="list-row"><span class="cell-muted">School</span><strong>${esc(s.name)}</strong></div>
+        <div class="list-row"><span class="cell-muted">Account Status</span>${subscriptionBadge(s)}</div>
+        <div class="list-row"><span class="cell-muted">Renewal</span><strong>${fmtDate(s.renewal)}</strong></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:14px">Update Sign-in Credentials</h3>
+        <form data-action="form:profile" novalidate>
+          <div class="field">
+            <label for="pf-name">Principal / Display Name</label>
+            <input class="input" id="pf-name" name="principalName" value="${esc(principal)}" placeholder="e.g. Mrs. A. Bello" />
+          </div>
+          <div class="field">
+            <label for="pf-email">Admin Email</label>
+            <input class="input" id="pf-email" name="email" type="email" value="${esc(adminEmail)}" readonly />
+            <span class="hint">Email changes require re-authentication. Contact support to update.</span>
+          </div>
+          <div class="field">
+            <label for="pf-current">Current Password</label>
+            <input class="input" id="pf-current" name="currentPassword" type="password" autocomplete="current-password" placeholder="••••••••" />
+          </div>
+          <div class="field">
+            <label for="pf-new">New Password</label>
+            <input class="input" id="pf-new" name="newPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters" />
+            <span class="hint">Leave both password fields blank to keep your existing password.</span>
+          </div>
+          <div class="field">
+            <label for="pf-confirm">Confirm New Password</label>
+            <input class="input" id="pf-confirm" name="confirmPassword" type="password" autocomplete="new-password" placeholder="Repeat new password" />
+          </div>
+          <div class="modal-foot" style="padding:0;margin-top:18px">
+            <button type="button" class="btn btn-ghost" data-action="modal:close">Cancel</button>
+            <button type="submit" class="btn btn-primary">${ic.check}<span>Save Profile</span></button>
+          </div>
+        </form>
       </div>
     </div>`;
 }
@@ -2418,6 +2544,7 @@ function studentApp() {
 function studentLogin() {
   const s = demoSchool();
   const sample = state.students.find((st) => st.schoolId === s.id) || state.students[0];
+  const samplePassword = sample ? (sample.password || DEFAULT_PIN) : DEFAULT_PIN;
   return `
   <div class="login-wrap">
     <div class="login-card">
@@ -2432,7 +2559,8 @@ function studentLogin() {
           </div>
           <div class="field">
             <label for="s-pin">Password</label>
-            <input class="input" id="s-pin" name="pin" type="password" placeholder="••••••" value="${DEFAULT_PIN}" required />
+            <input class="input" id="s-pin" name="pin" type="password" placeholder="••••••" value="${esc(samplePassword)}" required />
+            <span class="hint">Demo: the pre-filled ID and password above are for ${esc(sample ? sample.name : "the sample student")}. Use the credentials your school issued.</span>
           </div>
           <div class="field">
             <label for="s-term">Select Term</label>
@@ -3699,6 +3827,64 @@ document.addEventListener("submit", async (e) => {
       state.students.unshift(record);
       recordActivity("student.enrolled", "Student enrolled", `${name} enrolled in ${cls} · ID ${gen.id}.`);
       toast("Student enrolled", `${name} added to ${cls} · ID ${gen.id}. Credentials generated.`);
+    }
+    closeModal();
+    render();
+  }
+
+  if (action === "form:profile") {
+    const data = new FormData(form);
+    const principalName = String(data.get("principalName") || "").trim();
+    const currentPassword = String(data.get("currentPassword") || "");
+    const newPassword = String(data.get("newPassword") || "");
+    const confirmPassword = String(data.get("confirmPassword") || "");
+    clearFieldErrors(form);
+    const fail = (f, m) => { formFieldError(form, f, m); };
+    if (principalName && principalName.length < 2) fail("principalName", "Enter a name of at least 2 characters.");
+    if (newPassword) {
+      if (newPassword.length < 8) fail("newPassword", "New password must be at least 8 characters.");
+      else if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
+        fail("newPassword", "Use uppercase, lowercase, a number and a symbol.");
+      }
+      if (newPassword !== confirmPassword) fail("confirmPassword", "Passwords do not match.");
+      if (!currentPassword) fail("currentPassword", "Enter your current password to change it.");
+    }
+    if (form.querySelector("[data-err]")) { toast("Check the form", "Some fields need attention.", "error"); return; }
+
+    const s = state.school;
+    if (principalName) {
+      s.principalName = principalName;
+      s.principal = principalName;
+    }
+    if (LIVE_API) {
+      try {
+        const payload = {};
+        if (principalName) payload.principalName = principalName;
+        if (currentPassword && newPassword) {
+          payload.currentPassword = currentPassword;
+          payload.newPassword = newPassword;
+        }
+        const updated = await SyntaxApi.admin.updateProfile(payload);
+        liveUpsertSchool(updated);
+        state.school = schoolById(s.id);
+        if (newPassword) {
+          toast("Password updated", "Your sign-in password has been changed. Sign in again to continue.");
+          setTimeout(() => { authLogout(); }, 1200);
+        } else {
+          toast("Profile saved", "Your school profile has been updated.");
+        }
+        render();
+      } catch (err) {
+        toast("Profile update failed", err.message || "Could not update your profile.", "error");
+      }
+      return;
+    }
+    if (newPassword) {
+      s.password = newPassword;
+      toast("Password updated", "Your sign-in password has been changed. Sign in again to continue.");
+      setTimeout(() => { authLogout(); }, 1200);
+    } else {
+      toast("Profile saved", "Your school profile has been updated.");
     }
     closeModal();
     render();

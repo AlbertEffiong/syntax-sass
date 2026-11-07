@@ -46,7 +46,6 @@ export async function sendMail(message: MailMessage): Promise<void> {
  * Convenience template for teacher invitation OTPs.
  */
 export function sendTeacherOtpEmail(to: string, otp: string, schoolName: string, password?: string): Promise<void> {
-  const creds = password ? `\nSign-in email: ${to}\nPassword: ${password}\n` : '';
   return sendMail({
     to,
     subject: 'Your Syntax SaaS teacher activation code',
