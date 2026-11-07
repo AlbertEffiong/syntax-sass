@@ -11,6 +11,9 @@ import {
   AdminBankTransferBody,
   UpdateTeacherBody,
   AcademicSettingBody,
+  UpdateStudentBody,
+  RecordFeePaymentBody,
+  DebtorControlBody,
 } from '../validators/admin.validators';
 import { AssessmentStatus } from '../models/Assessment';
 
@@ -58,6 +61,29 @@ export const listStudents = asyncHandler(async (req: Request, res: Response) => 
   const currentClass = typeof req.query.currentClass === 'string' ? req.query.currentClass : undefined;
   const students = await adminService.listStudents(requireTenant(req), currentClass, page(req));
   return ok(res, students);
+});
+
+export const updateStudent = asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as UpdateStudentBody;
+  const student = await adminService.updateStudent(requireTenant(req), req.params.id, body);
+  return ok(res, student, 'Student updated.');
+});
+
+export const recordFeePayment = asyncHandler(async (req: Request, res: Response) => {
+  const { amount } = req.body as RecordFeePaymentBody;
+  const student = await adminService.recordFeePayment(requireTenant(req), req.params.id, amount);
+  return ok(res, student, 'Fee payment recorded.');
+});
+
+export const getDashboard = asyncHandler(async (req: Request, res: Response) => {
+  const dashboard = await adminService.getDashboard(requireTenant(req));
+  return ok(res, dashboard);
+});
+
+export const updateDebtorControl = asyncHandler(async (req: Request, res: Response) => {
+  const { restrictDebtors } = req.body as DebtorControlBody;
+  const school = await adminService.updateDebtorControl(requireTenant(req), restrictDebtors);
+  return ok(res, school, 'Debtor result access policy updated.');
 });
 
 /**

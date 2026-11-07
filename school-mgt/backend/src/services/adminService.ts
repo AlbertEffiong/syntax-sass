@@ -37,6 +37,24 @@ export interface EnrollStudentInput {
   dob: Date;
   currentClass: string;
   password: string;
+  guardian?: string;
+  contact?: string;
+  address?: string;
+  feeExpected?: number;
+  feeDue?: number;
+}
+
+export interface UpdateStudentInput {
+  fullName?: string;
+  gender?: 'Male' | 'Female';
+  dob?: Date;
+  currentClass?: string;
+  guardian?: string;
+  contact?: string;
+  address?: string;
+  feeExpected?: number;
+  feeDue?: number;
+  password?: string;
 }
 
 export interface ReviewAssessmentInput {
@@ -113,6 +131,11 @@ export async function enrollStudent(input: EnrollStudentInput): Promise<StudentP
 
   const studentId = await generateStudentId(school.uniqueSchoolPrefix);
   const password = await hashPassword(input.password);
+  const feeExpected = input.feeExpected ?? input.feeDue ?? 0;
+  const feeDue = input.feeDue ?? feeExpected;
+  if (feeDue > feeExpected) {
+    throw ApiError.badRequest('Amount due cannot exceed the expected fee.', 'INVALID_FEE_BALANCE');
+  }
 
   const student = await Student.create({
     schoolId: new Types.ObjectId(input.schoolId),
@@ -121,11 +144,103 @@ export async function enrollStudent(input: EnrollStudentInput): Promise<StudentP
     gender: input.gender,
     dob: input.dob,
     currentClass: cls.className,
+    guardian: input.guardian ?? '',
+    contact: input.contact ?? '',
+    address: input.address ?? '',
+    feeExpected,
+    feeCollected: feeExpected - feeDue,
+    feeDue,
     password,
     historicalResults: [],
   });
 
+  await cache.invalidatePrefix(`students:${input.schoolId}:`);
   return serializeStudent(student);
+}
+
+export async function updateStudent(
+  schoolId: string,
+  studentId: string,
+  patch: UpdateStudentInput,
+): Promise<StudentPublic> {
+  const student = await Student.findById(studentId);
+  if (!student) throw ApiError.notFound('Student not found.', 'STUDENT_NOT_FOUND');
+  assertSameSchool(student.schoolId, schoolId);
+
+  const nextExpected = patch.feeExpected ?? student.feeExpected;
+  const nextDue = patch.feeDue ?? student.feeDue;
+  if (nextDue > nextExpected) {
+    throw ApiError.badRequest('Amount due cannot exceed the expected fee.', 'INVALID_FEE_BALANCE');
+  }
+
+  if (patch.fullName !== undefined) student.fullName = patch.fullName;
+  if (patch.gender !== undefined) student.gender = patch.gender;
+  if (patch.dob !== undefined) student.dob = patch.dob;
+  if (patch.currentClass !== undefined) student.currentClass = patch.currentClass;
+  if (patch.guardian !== undefined) student.guardian = patch.guardian;
+  if (patch.contact !== undefined) student.contact = patch.contact;
+  if (patch.address !== undefined) student.address = patch.address;
+  if (patch.feeExpected !== undefined) student.feeExpected = patch.feeExpected;
+  if (patch.feeDue !== undefined) student.feeDue = patch.feeDue;
+  student.feeCollected = student.feeExpected - student.feeDue;
+  if (patch.password) student.password = await hashPassword(patch.password);
+
+  await student.save();
+  await cache.invalidatePrefix(`students:${schoolId}:`);
+  return serializeStudent(student);
+}
+
+export async function recordFeePayment(
+  schoolId: string,
+  studentId: string,
+  amount: number,
+): Promise<StudentPublic> {
+  const student = await Student.findById(studentId);
+  if (!student) throw ApiError.notFound('Student not found.', 'STUDENT_NOT_FOUND');
+  assertSameSchool(student.schoolId, schoolId);
+  if (amount > student.feeDue) {
+    throw ApiError.badRequest('Payment cannot exceed the outstanding balance.', 'PAYMENT_EXCEEDS_BALANCE');
+  }
+
+  student.feeDue -= amount;
+  student.feeCollected += amount;
+  await student.save();
+  await cache.invalidatePrefix(`students:${schoolId}:`);
+  return serializeStudent(student);
+}
+
+export async function getDashboard(schoolId: string) {
+  const [summary] = await Student.aggregate([
+    { $match: { schoolId: new Types.ObjectId(schoolId) } },
+    {
+      $group: {
+        _id: null,
+        studentCount: { $sum: 1 },
+        feeExpected: { $sum: '$feeExpected' },
+        feeCollected: { $sum: '$feeCollected' },
+        feePending: { $sum: '$feeDue' },
+        debtorCount: { $sum: { $cond: [{ $gt: ['$feeDue', 0] }, 1, 0] } },
+      },
+    },
+  ]);
+
+  return {
+    studentCount: summary?.studentCount ?? 0,
+    debtorCount: summary?.debtorCount ?? 0,
+    fees: {
+      expected: summary?.feeExpected ?? 0,
+      collected: summary?.feeCollected ?? 0,
+      pending: summary?.feePending ?? 0,
+    },
+  };
+}
+
+export async function updateDebtorControl(schoolId: string, restrictDebtors: boolean): Promise<SchoolPublic> {
+  const school = await School.findById(schoolId);
+  if (!school) throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');
+  school.restrictDebtors = restrictDebtors;
+  await school.save();
+  return serializeSchool(school);
 }
 
 /**

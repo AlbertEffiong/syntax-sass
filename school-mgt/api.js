@@ -36,6 +36,21 @@
 
   var bearerToken = null;
 
+  try {
+    if (typeof sessionStorage !== 'undefined') bearerToken = sessionStorage.getItem('syntaxApiToken');
+  } catch (e) {}
+
+  function storeToken(token) {
+    bearerToken = token || null;
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        if (bearerToken) sessionStorage.setItem('syntaxApiToken', bearerToken);
+        else sessionStorage.removeItem('syntaxApiToken');
+      }
+    } catch (e) {}
+    return token;
+  }
+
   /** Merge user configuration. */
   function configure(options) {
     if (options) {
@@ -91,10 +106,11 @@
 
     var unsafe = ['POST', 'PUT', 'PATCH', 'DELETE'].indexOf(method) !== -1;
 
-    if (cfg.authMode === 'bearer' && bearerToken) {
+    var usingBearer = cfg.authMode === 'bearer' && !!bearerToken;
+    if (usingBearer) {
       headers['Authorization'] = 'Bearer ' + bearerToken;
     }
-    if (cfg.authMode === 'cookie' && unsafe) {
+    if (!usingBearer && unsafe) {
       var csrf = getCookie('csrfToken');
       if (csrf) headers['x-csrf-token'] = csrf;
     }
@@ -175,7 +191,7 @@
     },
     logout: function () {
       return post('/api/auth/logout').catch(function () {}).then(function () {
-        bearerToken = null;
+        storeToken(null);
       });
     },
   };
@@ -205,6 +221,12 @@
     getSchool: function () {
       return get('/api/admin/school');
     },
+    dashboard: function () {
+      return get('/api/admin/dashboard');
+    },
+    updateDebtorControl: function (restrictDebtors) {
+      return patch('/api/admin/debtor-control', { restrictDebtors: restrictDebtors });
+    },
     updateAcademicSetting: function (payload) {
       return patch('/api/admin/academic-setting', payload);
     },
@@ -219,6 +241,12 @@
     },
     listStudents: function (params) {
       return get('/api/admin/students' + buildQuery(params));
+    },
+    updateStudent: function (id, payload) {
+      return patch('/api/admin/students/' + encodeURIComponent(id), payload);
+    },
+    recordStudentPayment: function (id, amount) {
+      return post('/api/admin/students/' + encodeURIComponent(id) + '/payments', { amount: amount });
     },
     listTeachers: function (params) {
       return get('/api/admin/teachers' + buildQuery(params));
@@ -265,7 +293,7 @@
   };
 
   function captureToken(data) {
-    if (data && data.token) bearerToken = data.token;
+    if (data && data.token) storeToken(data.token);
     return data;
   }
 
@@ -286,7 +314,7 @@
       return bearerToken;
     },
     setToken: function (token) {
-      bearerToken = token;
+      storeToken(token);
     },
     getConfig: function () {
       return Object.assign({}, cfg);

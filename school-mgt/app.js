@@ -169,7 +169,7 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
 function money(n) {
-  return "$" + Number(n).toLocaleString("en-US");
+  return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(Number(n) || 0);
 }
 function fmtDate(iso) {
   const d = new Date(iso + "T00:00:00");
@@ -223,10 +223,10 @@ function schoolPrefix(school) {
   return (letters.join("").slice(0, 4) || "SCH");
 }
 function genPassword(prefix) {
-  const s = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-  let x = "";
-  for (let i = 0; i < 4; i++) x += s[Math.floor(Math.random() * s.length)];
-  return `${prefix || "Syntax"}@${x}`;
+  const pick = (chars) => chars[Math.floor(Math.random() * chars.length)];
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const suffix = [pick("abcdefghjkmnpqrstuvwxyz"), pick("ABCDEFGHJKMNPQRSTUVWXYZ"), pick("23456789"), pick("!@#$%"), ...Array.from({ length: 3 }, () => pick(chars))].join("");
+  return `${prefix || "Syntax"}@${suffix}`;
 }
 function nextStudentId(schoolId) {
   const school = schoolById(schoolId) || state.school;
@@ -973,7 +973,7 @@ function graceBanner() {
 function adminDashboard() {
   const s = state.school;
   const collected = state.fees.collected;
-  const pct = Math.round((collected / state.fees.expected) * 100);
+  const pct = state.fees.expected ? Math.round((collected / state.fees.expected) * 100) : 0;
   const debtors = state.students.filter((st) => st.schoolId === state.school.id && st.due > 0).length;
 
   const activity = [
@@ -998,7 +998,7 @@ function adminDashboard() {
     </div>
 
     <div class="grid stats-grid" style="margin-bottom:20px">
-      <div class="card stat"><div class="stat-top"><div class="stat-icon blue">${ic.users}</div></div><div class="stat-value">${s.students || 348}</div><div class="stat-label">Total Students</div><div class="stat-delta up">${ic.trend} <span>+12 this term</span></div></div>
+      <div class="card stat"><div class="stat-top"><div class="stat-icon blue">${ic.users}</div></div><div class="stat-value">${LIVE_API ? (s.students || 0) : (s.students || 348)}</div><div class="stat-label">Total Students</div><div class="stat-delta up">${ic.trend} <span>${LIVE_API ? "School register" : "+12 this term"}</span></div></div>
       <div class="card stat"><div class="stat-top"><div class="stat-icon purple">${ic.userCheck}</div></div><div class="stat-value">24</div><div class="stat-label">Total Teachers</div><div class="stat-delta up"><span>2 on leave</span></div></div>
       <div class="card stat"><div class="stat-top"><div class="stat-icon green">${ic.wallet}</div></div><div class="stat-value">${money(collected)}</div><div class="stat-label">Fees Collected</div><div class="stat-delta up">${ic.trend} <span>${pct}% of expected</span></div></div>
       <div class="card stat"><div class="stat-top"><div class="stat-icon amber">${ic.clock}</div></div><div class="stat-value">${pendingAssessments().length}</div><div class="stat-label">Pending Results Approval</div><div class="stat-delta down"><span>Awaiting your review</span></div></div>
@@ -1172,6 +1172,10 @@ function studentModal(st) {
   const prefix = schoolPrefix(state.school);
   const gen = editing ? null : nextStudentId(state.school.id);
   const autoPass = editing ? (st.password || "") : genPassword(prefix);
+  const studentClasses = LIVE_API
+    ? state.classes.filter((item) => String(item.schoolId) === String(state.school.id)).map((item) => item.name)
+    : CLASS_LEVELS;
+  if (editing && !studentClasses.includes(st.cls)) studentClasses.push(st.cls);
   st = st || { name: "", gender: "", dob: "", guardian: "", contact: "", address: "", cls: CLASS_LEVELS[0], due: 0 };
   const err = (name) => `<span class="field-err" data-err="${name}"></span>`;
   openModal(`
@@ -1181,7 +1185,7 @@ function studentModal(st) {
     </div>
     <form data-action="form:student" data-id="${editing ? esc(st.id) : ""}">
       <div class="modal-body">
-        ${editing ? "" : `<div class="genbanner">${ic.shield}<div><strong>New credentials:</strong> Student ID <code>${esc(gen.id)}</code> · Password <code>${esc(autoPass)}</code></div></div>`}
+        ${editing ? "" : `<div class="genbanner">${ic.shield}<div>${LIVE_API ? "School-specific Student ID will be generated when enrolled." : `<strong>New credentials:</strong> Student ID <code>${esc(gen.id)}</code> · Password <code>${esc(autoPass)}</code>`}</div></div>`}
         <div class="field">
           <label for="st-name">Full Name</label>
           <input class="input" id="st-name" name="name" value="${esc(st.name)}" placeholder="e.g. Chinedu Okeke" />
@@ -1218,12 +1222,12 @@ function studentModal(st) {
         <div class="input-group">
           <div class="field">
             <label for="st-cls">Current Class</label>
-            <select class="select" id="st-cls" name="cls">${CLASS_LEVELS.map((c) => `<option ${c === st.cls ? "selected" : ""}>${c}</option>`).join("")}</select>
+            <select class="select" id="st-cls" name="cls">${studentClasses.map((c) => `<option ${c === st.cls ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
             <span class="hint">JSS1–JSS3 &amp; SS1–SS3</span>
           </div>
           <div class="field">
             <label for="st-id">Student ID</label>
-            <input class="input code" id="st-id" name="id" value="${esc(editing ? st.id : gen.id)}" readonly />
+            <input class="input code" id="st-id" name="id" value="${esc(editing ? st.id : (LIVE_API ? "Generated on save" : gen.id))}" readonly />
             <span class="hint">Prefix <strong>${esc(prefix)}</strong> · school-specific</span>
           </div>
         </div>
@@ -1231,6 +1235,10 @@ function studentModal(st) {
           <label for="st-address">Residential Address</label>
           <input class="input" id="st-address" name="address" value="${esc(st.address || "")}" placeholder="House number, street, city" />
           ${err("address")}
+        </div>
+        <div class="field">
+          <label for="st-expected">Expected Fee (NGN)</label>
+          <input class="input" id="st-expected" name="expected" type="number" min="0" value="${st.feeExpected || st.due || 0}" />
         </div>
         <div class="input-group">
           <div class="field">
@@ -2325,8 +2333,31 @@ function studentResult() {
     || state.students.find((x) => x.schoolId === s.id)
     || state.students[0];
   const term = state.auth.student.term || "First Term";
-  const r = computeResult(st, term);
-  const restrict = s.restrictDebtors;
+  const liveReport = state.liveStudentReport;
+  const resultError = state.liveStudentResultsError;
+  if (LIVE_API && !liveReport && resultError?.code !== "DEBTOR_RESULTS_RESTRICTED") {
+    return `<div class="login-wrap"><div class="notice-block"><div class="notice-icon">${ic.alert}</div><div><div class="notice-title">Results unavailable</div><div class="notice-text">${esc(resultError?.message || "Loading your result…")}</div></div></div></div>`;
+  }
+  const r = LIVE_API ? {
+    session: liveReport?.session || "",
+    cls: liveReport?.student?.currentClass || (st && st.cls),
+    rows: (liveReport?.subjects || []).map((subject) => ({
+      subject: subject.subject,
+      ca: Number(subject.ca1 || 0) + Number(subject.ca2 || 0),
+      exam: subject.exam,
+      total: subject.total,
+      grade: subject.grade,
+    })),
+    total: liveReport?.total || 0,
+    average: liveReport?.average || 0,
+    classSize: liveReport?.classSize || 0,
+    position: liveReport?.position || 0,
+    attendance: { present: 0, total: 0 },
+    remark: "",
+  } : computeResult(st, term);
+  const restrict = LIVE_API
+    ? resultError?.code === "DEBTOR_RESULTS_RESTRICTED"
+    : !!(s.restrictDebtors && st && st.due > 0);
 
   if (restrict) {
     return `
@@ -3058,10 +3089,26 @@ document.addEventListener("change", (e) => {
     }
   }
   if (action === "toggle:debtors") {
-    state.school.restrictDebtors = el.checked;
-    toast("Debtors control " + (el.checked ? "enabled" : "disabled"),
-      el.checked ? "Students with unpaid fees will not see results." : "All students can now view results.", "info");
-    render();
+    const previous = state.school.restrictDebtors;
+    if (LIVE_API) {
+      el.disabled = true;
+      SyntaxApi.admin.updateDebtorControl(el.checked).then((school) => {
+        liveUpsertSchool(school);
+        state.school = schoolById(state.school.id);
+        toast("Debtors control " + (el.checked ? "enabled" : "disabled"),
+          el.checked ? "Students with outstanding fees cannot access results." : "Result access restored for all students.", "info");
+        render();
+      }).catch((err) => {
+        state.school.restrictDebtors = previous;
+        toast("Policy update failed", err.message || "Could not update debtor control.", "error");
+        render();
+      });
+    } else {
+      state.school.restrictDebtors = el.checked;
+      toast("Debtors control " + (el.checked ? "enabled" : "disabled"),
+        el.checked ? "Students with unpaid fees will not see results." : "All students can now view results.", "info");
+      render();
+    }
   }
 });
 
@@ -3321,12 +3368,49 @@ document.addEventListener("submit", async (e) => {
     }
     if (guardian.length < 2) fail("guardian", "Enter the parent/guardian name.");
     if (!/^[+()\d][\d\s()+.-]{6,}$/.test(contact)) fail("contact", "Enter a valid contact number.");
-    if (CLASS_LEVELS.indexOf(cls) === -1) fail("cls", "Choose a valid class.");
+    const validClasses = LIVE_API
+      ? state.classes.filter((item) => String(item.schoolId) === String(state.school.id)).map((item) => item.name)
+      : CLASS_LEVELS;
+    if (validClasses.indexOf(cls) === -1) fail("cls", "Choose a valid class.");
     if (address.length < 4) fail("address", "Enter the residential address.");
-    if (password.length < 6) fail("password", "Password must be at least 6 characters.");
+    if ((!sid || password) && password.length < (LIVE_API ? 8 : 6)) fail("password", `Password must be at least ${LIVE_API ? 8 : 6} characters.`);
     if (!valid) { toast("Check the form", "Some fields need attention.", "error"); return; }
 
-    const bio = { name, gender, dob, guardian, contact, address, cls, due, paid: due === 0, password };
+    const feeExpected = Math.max(0, Number(data.get("expected")) || 0);
+    if (due > feeExpected) {
+      formFieldError(form, "due", "Amount due cannot exceed the expected fee.");
+      toast("Check fee amounts", "Outstanding fees cannot exceed the expected fee.", "error");
+      return;
+    }
+    const bio = { name, gender, dob, guardian, contact, address, cls, due, paid: due === 0, feeExpected, password };
+    if (LIVE_API) {
+      try {
+        const payload = {
+          fullName: name,
+          gender,
+          dob,
+          currentClass: cls,
+          guardian,
+          contact,
+          address,
+          feeExpected,
+          feeDue: due,
+        };
+        if (password) payload.password = password;
+        const saved = sid
+          ? await SyntaxApi.admin.updateStudent(state.students.find((student) => student.id === sid)?.dbId, payload)
+          : await SyntaxApi.admin.enrollStudent({ ...payload, password });
+        const student = liveUpsertStudent(saved);
+        closeModal();
+        await liveLoadAdminData();
+        if (sid) toast("Student updated", `${student.name}'s school record has been saved.`);
+        else toast("Student enrolled", `${student.name} added to ${student.cls} · ID ${student.id}. Password: ${password}`);
+        render();
+      } catch (err) {
+        toast(sid ? "Student update failed" : "Enrollment failed", err.message || "Could not save this student.", "error");
+      }
+      return;
+    }
     if (sid) {
       const st = state.students.find((s) => s.id === sid);
       if (st) Object.assign(st, bio);
@@ -3442,6 +3526,19 @@ document.addEventListener("submit", async (e) => {
     const st = state.students.find((s) => s.id === sid);
     if (!st) return;
     const amount = Math.max(1, Math.min(Number(data.get("amount")) || 0, st.due));
+    if (LIVE_API) {
+      try {
+        const updated = await SyntaxApi.admin.recordStudentPayment(st.dbId, amount);
+        liveUpsertStudent(updated);
+        await liveLoadAdminData();
+        closeModal();
+        toast("Payment recorded", `${money(amount)} received from ${st.name}.`);
+        render();
+      } catch (err) {
+        toast("Payment failed", err.message || "Could not record this payment.", "error");
+      }
+      return;
+    }
     st.due -= amount;
     if (st.due <= 0) { st.due = 0; st.paid = true; }
     state.fees.collected += amount;
@@ -3503,6 +3600,7 @@ function liveUpsertSchool(u) {
     adminEmail: u.email,
     principal: u.principalName || "",
     principalName: u.principalName || "",
+    restrictDebtors: !!u.restrictDebtors,
     uniqueSchoolPrefix: u.uniqueSchoolPrefix || "",
     academic: u.academic || null,
   };
@@ -3535,22 +3633,25 @@ function liveUpsertStudent(u) {
   const parts = String(u.studentId || "").split("/");
   const rec = {
     id: u.studentId,
+    dbId: u.id,
     schoolId: u.schoolId || (state.school && state.school.id),
     prefix: parts[0] || "",
     seq: Number(parts[2]) || 0,
     name: u.fullName,
     gender: u.gender || "",
     dob: u.dob ? String(u.dob).slice(0, 10) : "",
-    guardian: "",
-    contact: "",
-    address: "",
+    guardian: u.guardian || "",
+    contact: u.contact || "",
+    address: u.address || "",
     cls: u.currentClass || "",
     entryCls: u.currentClass || "",
     enrolledYear: Number(parts[1]) || new Date().getFullYear(),
     password: "",
     pin: "",
-    due: 0,
-    paid: true,
+    feeExpected: Number(u.feeExpected) || 0,
+    feeCollected: Number(u.feeCollected) || 0,
+    due: Number(u.feeDue) || 0,
+    paid: !(Number(u.feeDue) > 0),
     status: "Active",
     history: [],
   };
@@ -3558,6 +3659,54 @@ function liveUpsertStudent(u) {
   if (existing) Object.assign(existing, rec);
   else state.students.push(rec);
   return state.students.find((s) => String(s.id) === String(u.studentId));
+}
+
+async function liveLoadAdminData() {
+  const schoolId = String(state.school.id);
+  const [dashboard, studentPage, classRows, schoolData] = await Promise.all([
+    SyntaxApi.admin.dashboard(),
+    SyntaxApi.admin.listStudents({ page: 1, limit: 100 }),
+    SyntaxApi.admin.listClasses(),
+    SyntaxApi.admin.getSchool(),
+  ]);
+
+  const students = [...(studentPage.items || [])];
+  let page = 2;
+  while (studentPage.hasNext && page <= studentPage.totalPages) {
+    const next = await SyntaxApi.admin.listStudents({ page, limit: 100 });
+    students.push(...(next.items || []));
+    page += 1;
+  }
+
+  state.students = state.students.filter((student) => String(student.schoolId) !== schoolId);
+  students.forEach((student) => liveUpsertStudent(student));
+  state.classes = state.classes.filter((item) => String(item.schoolId) !== schoolId).concat(
+    classRows.map((item) => ({
+      id: item.id,
+      schoolId,
+      name: item.className,
+      subjects: item.subjects || [],
+      teacher: item.teacherEmail || "",
+      students: 0,
+    })),
+  );
+  state.fees = dashboard.fees || { collected: 0, pending: 0, expected: 0 };
+  state.school.students = dashboard.studentCount || 0;
+  liveUpsertSchool(schoolData);
+  state.school = schoolById(schoolId);
+}
+
+async function liveLoadStudentResult(term) {
+  state.liveStudentReport = null;
+  state.liveStudentResultsError = null;
+  try {
+    state.liveStudentReport = await SyntaxApi.student.results({ term: term || "First Term" });
+    const report = state.liveStudentReport;
+    if (report.student) liveUpsertStudent({ ...report.student, schoolId: report.schoolId || state.school?.id });
+    if (report.schoolName && state.school) state.school.name = report.schoolName;
+  } catch (err) {
+    state.liveStudentResultsError = err;
+  }
 }
 
 async function liveLogin(role, form) {
@@ -3570,10 +3719,16 @@ async function liveLogin(role, form) {
       });
       SyntaxApi.setToken(res.token);
       liveUpsertStudent(res.user);
+      state.school = Object.assign({}, state.school || {}, {
+        id: res.user.schoolId,
+        name: res.user.schoolName || "School",
+        restrictDebtors: false,
+      });
       state.auth.tier = "student";
       state.auth.student = { loggedIn: true, id: res.user.studentId, term: data.get("term") || "First Term" };
+      await liveLoadStudentResult(state.auth.student.term);
       saveSession();
-      toast("Verified", "Loading your term result…");
+      toast(state.liveStudentResultsError?.code === "DEBTOR_RESULTS_RESTRICTED" ? "Result access restricted" : "Verified", state.liveStudentResultsError?.message || "Loading your term result…", state.liveStudentResultsError ? "error" : "success");
       render();
       return;
     }
@@ -3591,6 +3746,7 @@ async function liveLogin(role, form) {
       state.school = school;
       state.auth.tier = "admin";
       state.auth.admin = { loggedIn: true, schoolId: school.id, email: school.adminEmail };
+      await liveLoadAdminData();
       if (isSubscriptionLocked(school)) toast("Subscription inactive", "Renew to restore full access.", "error");
       else toast("Welcome", `Signed in to ${school.name}.`);
     } else if (role === "teacher") {
@@ -3634,14 +3790,17 @@ async function liveRestore() {
       state.school = school;
       state.auth.tier = "admin";
       state.auth.admin = { loggedIn: true, schoolId: school.id, email: school.adminEmail };
+      await liveLoadAdminData();
     } else if (u.role === "teacher") {
       const t = liveUpsertTeacher({ id: u.id, schoolId: u.schoolId, name: u.email, email: u.email, verified: true });
       state.auth.tier = "teacher";
       state.auth.teacher = { loggedIn: true, teacherId: t.id, email: u.email };
     } else if (u.role === "student") {
       liveUpsertStudent({ studentId: u.email, schoolId: u.schoolId });
+      state.school = Object.assign({}, state.school || {}, { id: u.schoolId, name: "School", restrictDebtors: false });
       state.auth.tier = "student";
       state.auth.student = { loggedIn: true, id: u.email, term: "First Term" };
+      await liveLoadStudentResult("First Term");
     }
   } catch (e) {
     /* Not authenticated — remain on the login screen. */

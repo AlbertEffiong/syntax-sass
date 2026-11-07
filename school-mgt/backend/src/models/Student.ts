@@ -37,6 +37,12 @@ export interface IStudent {
   gender: Gender;
   dob: Date;
   currentClass: string;
+  guardian: string;
+  contact: string;
+  address: string;
+  feeExpected: number;
+  feeCollected: number;
+  feeDue: number;
   password: string;
   historicalResults: IHistoricalResult[];
   createdAt: Date;
@@ -84,6 +90,12 @@ const studentSchema = new Schema<IStudentDocument>(
     gender: { type: String, enum: ['Male', 'Female'], required: true },
     dob: { type: Date, required: true },
     currentClass: { type: String, required: true, trim: true },
+    guardian: { type: String, trim: true, default: '' },
+    contact: { type: String, trim: true, default: '' },
+    address: { type: String, trim: true, default: '' },
+    feeExpected: { type: Number, min: 0, default: 0 },
+    feeCollected: { type: Number, min: 0, default: 0 },
+    feeDue: { type: Number, min: 0, default: 0 },
     password: { type: String, required: true, select: false },
     historicalResults: { type: [historicalResultSchema], default: [] },
   },

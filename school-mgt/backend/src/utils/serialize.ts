@@ -20,6 +20,7 @@ export interface SchoolPublic {
   uniqueSchoolPrefix: string;
   principalName: string;
   planMonthly: number;
+  restrictDebtors: boolean;
   academic: {
     currentSession: string;
     currentTerm: string;
@@ -39,6 +40,7 @@ export function serializeSchool(school: ISchoolDocument): SchoolPublic {
     uniqueSchoolPrefix: school.uniqueSchoolPrefix,
     principalName: school.principalName,
     planMonthly: school.planMonthly,
+    restrictDebtors: school.restrictDebtors,
     academic: {
       currentSession: school.academic?.currentSession ?? '',
       currentTerm: school.academic?.currentTerm ?? '',
@@ -87,21 +89,35 @@ export function serializeClass(cls: IClassDocument): ClassPublic {
 
 export interface StudentPublic {
   id: string;
+  schoolId: string;
   studentId: string;
   fullName: string;
   gender: string;
   dob: Date;
   currentClass: string;
+  guardian: string;
+  contact: string;
+  address: string;
+  feeExpected: number;
+  feeCollected: number;
+  feeDue: number;
 }
 
 export function serializeStudent(student: IStudentDocument): StudentPublic {
   return {
     id: String(student._id),
+    schoolId: String(student.schoolId),
     studentId: student.studentId,
     fullName: student.fullName,
     gender: student.gender,
     dob: student.dob,
     currentClass: student.currentClass,
+    guardian: student.guardian,
+    contact: student.contact,
+    address: student.address,
+    feeExpected: student.feeExpected,
+    feeCollected: student.feeCollected,
+    feeDue: student.feeDue,
   };
 }
 

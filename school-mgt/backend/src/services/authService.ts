@@ -117,7 +117,22 @@ export async function login(input: LoginInput): Promise<AuthenticatedResult<OwnS
   }
 }
 
-type OwnServerPublic = OwnerPublic | SchoolPublic | TeacherPublic | { id: string; studentId: string; fullName: string; currentClass: string };
+type OwnServerPublic = OwnerPublic | SchoolPublic | TeacherPublic | {
+  id: string;
+  schoolId: string;
+  schoolName: string;
+  studentId: string;
+  fullName: string;
+  gender: string;
+  dob: Date;
+  currentClass: string;
+  guardian: string;
+  contact: string;
+  address: string;
+  feeExpected: number;
+  feeCollected: number;
+  feeDue: number;
+};
 
 async function loginOwner(input: LoginInput): Promise<AuthenticatedResult<OwnerPublic>> {
   requireEmail(input);
@@ -167,7 +182,7 @@ async function loginTeacher(input: LoginInput): Promise<AuthenticatedResult<Teac
 
 async function loginStudent(
   input: LoginInput,
-): Promise<AuthenticatedResult<{ id: string; studentId: string; fullName: string; currentClass: string }>> {
+): Promise<AuthenticatedResult<Extract<OwnServerPublic, { schoolId: string }>>> {
   if (!input.studentId) {
     throw ApiError.badRequest('Student ID is required for student login.', 'STUDENT_ID_REQUIRED');
   }
@@ -182,12 +197,23 @@ async function loginStudent(
     schoolId: String(student.schoolId),
     email: student.studentId,
   };
+  const school = await School.findById(student.schoolId).select('name');
   return {
     user: {
       id: String(student._id),
+      schoolId: String(student.schoolId),
+      schoolName: school?.name ?? '',
       studentId: student.studentId,
       fullName: student.fullName,
+      gender: student.gender,
+      dob: student.dob,
       currentClass: student.currentClass,
+      guardian: student.guardian,
+      contact: student.contact,
+      address: student.address,
+      feeExpected: student.feeExpected,
+      feeCollected: student.feeCollected,
+      feeDue: student.feeDue,
     },
     authUser,
     tokenSubject: authUser,

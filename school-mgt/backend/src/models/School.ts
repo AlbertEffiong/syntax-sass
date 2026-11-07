@@ -32,6 +32,7 @@ export interface ISchool {
   principalName: string;
   /** Monthly plan price (used for MRR calculations). */
   planMonthly: number;
+  restrictDebtors: boolean;
   academic: IAcademicSetting;
   pendingPayment?: IPendingPayment;
   createdAt: Date;
@@ -114,6 +115,7 @@ const schoolSchema = new Schema<ISchoolDocument, ISchoolModel>(
     },
     principalName: { type: String, trim: true, default: '' },
     planMonthly: { type: Number, default: 49, min: 0 },
+    restrictDebtors: { type: Boolean, default: false },
     academic: { type: academicSchema, default: () => ({}) },
     pendingPayment: { type: pendingPaymentSchema, default: undefined },
   },

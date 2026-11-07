@@ -19,12 +19,16 @@ export interface ReportSubject {
 }
 
 export interface ReportCard {
+  schoolId: string;
+  schoolName: string;
   student: {
     id: string;
+    schoolId: string;
     studentId: string;
     fullName: string;
     gender: string;
     currentClass: string;
+    feeDue: number;
   };
   term: string;
   session: string;
@@ -60,6 +64,9 @@ export async function getResults(input: GetResultsInput): Promise<ReportCard> {
   assertSameSchool(student.schoolId, input.schoolId);
 
   const school = await School.findById(input.schoolId);
+  if (school?.restrictDebtors && student.feeDue > 0) {
+    throw ApiError.forbidden('Outstanding school fees restrict access to results.', 'DEBTOR_RESULTS_RESTRICTED');
+  }
   const { term, session } = await resolveTermSession(input, school?.academic);
 
   const assessments = await Assessment.find({
@@ -71,7 +78,7 @@ export async function getResults(input: GetResultsInput): Promise<ReportCard> {
   });
 
   if (assessments.length === 0) {
-    return buildFromHistory(student, term, session, school?.principalName ?? '');
+    return buildFromHistory(student, term, session, school?.principalName ?? '', input.schoolId, school?.name ?? '');
   }
 
   // Resolve dynamic teacher names for each subject.
@@ -107,12 +114,16 @@ export async function getResults(input: GetResultsInput): Promise<ReportCard> {
   const classTeacherNames = subjects.map((s) => s.teacherName).filter(Boolean);
 
   return {
+    schoolId: input.schoolId,
+    schoolName: school?.name ?? '',
     student: {
       id: String(student._id),
+      schoolId: String(student.schoolId),
       studentId: student.studentId,
       fullName: student.fullName,
       gender: student.gender,
       currentClass: student.currentClass,
+      feeDue: student.feeDue ?? 0,
     },
     term,
     session,
@@ -184,6 +195,8 @@ function buildFromHistory(
   term: string,
   session: string,
   principalNameFromSchool: string,
+  schoolId: string,
+  schoolName: string,
 ): ReportCard {
   const doc = student;
   const history =
@@ -198,12 +211,16 @@ function buildFromHistory(
   }
 
   return {
+    schoolId,
+    schoolName,
     student: {
       id: String(doc._id),
+      schoolId: String(doc.schoolId),
       studentId: doc.studentId,
       fullName: doc.fullName,
       gender: doc.gender,
       currentClass: doc.currentClass,
+      feeDue: doc.feeDue ?? 0,
     },
     term: history.term,
     session: history.session,

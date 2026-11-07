@@ -13,6 +13,9 @@ import {
   listStudentsQuerySchema,
   reviewAssessmentSchema,
   updateTeacherSchema,
+  updateStudentSchema,
+  recordFeePaymentSchema,
+  debtorControlSchema,
 } from '../validators/admin.validators';
 
 const router = Router();
@@ -22,6 +25,8 @@ router.use(authenticate, authorize('admin'), enforceTenant);
 
 // --- School profile & academic calendar ---
 router.get('/school', adminController.getSchoolSettings);
+router.get('/dashboard', adminController.getDashboard);
+router.patch('/debtor-control', validate(debtorControlSchema), adminController.updateDebtorControl);
 router.patch('/academic-setting', validate(academicSettingSchema), adminController.updateAcademicSetting);
 
 // --- Classes (curriculum source of truth) ---
@@ -31,6 +36,8 @@ router.get('/classes', adminController.listClasses);
 // --- Students ---
 router.post('/students', validate(enrollStudentSchema), adminController.enrollStudent);
 router.get('/students', validate(listStudentsQuerySchema, 'query'), adminController.listStudents);
+router.patch('/students/:id', validate(idParamsSchema, 'params'), validate(updateStudentSchema), adminController.updateStudent);
+router.post('/students/:id/payments', validate(idParamsSchema, 'params'), validate(recordFeePaymentSchema), adminController.recordFeePayment);
 
 // --- Teachers ---
 router.get('/teachers', adminController.listTeachers);

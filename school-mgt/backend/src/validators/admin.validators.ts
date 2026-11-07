@@ -14,6 +14,40 @@ export const enrollStudentSchema = z.object({
   dob: z.coerce.date(),
   currentClass: z.string().min(1, 'Current class is required.').trim(),
   password: passwordSchema,
+  guardian: z.string().trim().optional(),
+  contact: z.string().trim().optional(),
+  address: z.string().trim().optional(),
+  feeExpected: z.number().nonnegative().optional(),
+  feeDue: z.number().nonnegative().optional(),
+}).refine((value) => (value.feeDue ?? 0) <= (value.feeExpected ?? value.feeDue ?? 0), {
+  message: 'Amount due cannot exceed the expected fee.',
+  path: ['feeDue'],
+});
+
+export const updateStudentSchema = z.object({
+  fullName: z.string().min(2).trim().optional(),
+  gender: z.enum(['Male', 'Female']).optional(),
+  dob: z.coerce.date().optional(),
+  currentClass: z.string().min(1).trim().optional(),
+  guardian: z.string().trim().optional(),
+  contact: z.string().trim().optional(),
+  address: z.string().trim().optional(),
+  feeExpected: z.number().nonnegative().optional(),
+  feeDue: z.number().nonnegative().optional(),
+  password: passwordSchema.optional(),
+}).refine((value) => Object.keys(value).length > 0, {
+  message: 'Provide at least one field to update.',
+}).refine((value) => value.feeDue === undefined || value.feeExpected === undefined || value.feeDue <= value.feeExpected, {
+  message: 'Amount due cannot exceed the expected fee.',
+  path: ['feeDue'],
+});
+
+export const recordFeePaymentSchema = z.object({
+  amount: z.number().positive(),
+});
+
+export const debtorControlSchema = z.object({
+  restrictDebtors: z.boolean(),
 });
 
 export const reviewAssessmentSchema = z.object({
@@ -56,6 +90,9 @@ export const academicSettingSchema = z.object({
 
 export type CreateClassBody = z.infer<typeof createClassSchema>;
 export type EnrollStudentBody = z.infer<typeof enrollStudentSchema>;
+export type UpdateStudentBody = z.infer<typeof updateStudentSchema>;
+export type RecordFeePaymentBody = z.infer<typeof recordFeePaymentSchema>;
+export type DebtorControlBody = z.infer<typeof debtorControlSchema>;
 export type ReviewAssessmentBody = z.infer<typeof reviewAssessmentSchema>;
 export type AdminBankTransferBody = z.infer<typeof adminBankTransferSchema>;
 export type UpdateTeacherBody = z.infer<typeof updateTeacherSchema>;

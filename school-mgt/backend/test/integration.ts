@@ -191,6 +191,11 @@ async function main(): Promise<void> {
       dob: '2012-03-14',
       currentClass: 'JSS 1A',
       password: 'Pupil@12345',
+      guardian: 'Mrs. Bakare',
+      contact: '+2348012345678',
+      address: 'Lagos',
+      feeExpected: 1000,
+      feeDue: 600,
     });
     check('enroll student auto-id BFA/YYYY/001', studentA1.status === 201 && /^BFA\/\d{4}\/001$/.test(studentA1.json?.data?.studentId), studentA1.json);
 
@@ -202,6 +207,35 @@ async function main(): Promise<void> {
       password: 'Pupil@12345',
     });
     check('second student sequence /002', /^BFA\/\d{4}\/002$/.test(studentA2.json?.data?.studentId), studentA2.json);
+
+    const persistedStudents = await adminA.get('/api/admin/students?page=1&limit=100');
+    check(
+      'student list persists school-owned student and fees',
+      persistedStudents.status === 200 && persistedStudents.json?.data?.items?.some((student: any) =>
+        student.studentId === studentA1.json.data.studentId && student.schoolId === schoolA.json.data.id &&
+        student.feeExpected === 1000 && student.feeCollected === 400 && student.feeDue === 600),
+      persistedStudents.json,
+    );
+    const adminAfterRelogin = new Client();
+    const relogin = await adminAfterRelogin.post('/api/auth/login', {
+      role: 'admin',
+      email: 'admin@brightfuture.edu',
+      password: 'Admin@12345',
+    });
+    const restoredStudentList = await adminAfterRelogin.get('/api/admin/students?page=1&limit=100');
+    check(
+      'student remains listed after admin logout and login',
+      relogin.status === 200 && restoredStudentList.status === 200 &&
+        restoredStudentList.json?.data?.items?.some((student: any) => student.studentId === studentA1.json.data.studentId),
+      restoredStudentList.json,
+    );
+    const feeDashboard = await adminA.get('/api/admin/dashboard');
+    check(
+      'school dashboard aggregates expected collected and pending fees',
+      feeDashboard.status === 200 && feeDashboard.json?.data?.fees?.expected === 1000 &&
+        feeDashboard.json?.data?.fees?.collected === 400 && feeDashboard.json?.data?.fees?.pending === 600,
+      feeDashboard.json,
+    );
 
     const badClass = await adminA.post('/api/admin/students', {
       fullName: 'No Class',
@@ -288,6 +322,12 @@ async function main(): Promise<void> {
       studentId: studentA1.json.data.studentId,
       password: 'Pupil@12345',
     });
+    check(
+      'student login carries owning school and fee balance',
+      studentLogin.status === 200 && studentLogin.json?.data?.user?.schoolId === schoolA.json.data.id &&
+        studentLogin.json?.data?.user?.feeDue === 600,
+      studentLogin.json,
+    );
     check('student login 200', studentLogin.status === 200, studentLogin.json);
 
     const results = await studentClient.get('/api/student/results');
@@ -356,6 +396,25 @@ async function main(): Promise<void> {
 
     const unlockedResults = await studentClient.get('/api/student/results');
     check('results available again after reactivation', unlockedResults.status === 200, unlockedResults.json);
+
+    const restrictDebtors = await adminA.patch('/api/admin/debtor-control', { restrictDebtors: true });
+    check('admin enables debtor result restriction', restrictDebtors.status === 200 && restrictDebtors.json?.data?.restrictDebtors === true, restrictDebtors.json);
+    const blockedDebtorResults = await studentClient.get('/api/student/results');
+    check(
+      'owing student is blocked from results',
+      blockedDebtorResults.status === 403 && blockedDebtorResults.json?.error?.code === 'DEBTOR_RESULTS_RESTRICTED',
+      blockedDebtorResults.json,
+    );
+    const feePayment = await adminA.post(`/api/admin/students/${studentA1.json.data.id}/payments`, { amount: 600 });
+    check('school admin records fee payment', feePayment.status === 200 && feePayment.json?.data?.feeDue === 0, feePayment.json);
+    const releasedResults = await studentClient.get('/api/student/results');
+    check('paid student regains result access', releasedResults.status === 200, releasedResults.json);
+    const finalFees = await adminA.get('/api/admin/dashboard');
+    check(
+      'recorded payment updates collected and pending totals',
+      finalFees.json?.data?.fees?.collected === 1000 && finalFees.json?.data?.fees?.pending === 0,
+      finalFees.json,
+    );
 
     // --------------------------------------------- new endpoints / features
     const ownerSchools = await owner.get('/api/owner/schools?page=1&limit=10');
