@@ -15,6 +15,7 @@ import {
   UpdateStudentBody,
   RecordFeePaymentBody,
   DebtorControlBody,
+  UpdateClassBody,
 } from '../validators/admin.validators';
 import { AssessmentStatus } from '../models/Assessment';
 
@@ -36,6 +37,16 @@ export const createClass = asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as CreateClassBody;
   const cls = await adminService.createClass({ schoolId: requireTenant(req), ...body });
   return created(res, cls, 'Class created successfully.');
+});
+
+/**
+ * PATCH /api/admin/classes/:id
+ * Updates an existing class's name, subjects and/or form teacher.
+ */
+export const updateClass = asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as UpdateClassBody;
+  const cls = await adminService.updateClass(requireTenant(req), req.params.id, body);
+  return ok(res, cls, 'Class updated.');
 });
 
 /**

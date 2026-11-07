@@ -248,6 +248,9 @@
     createClass: function (payload) {
       return post('/api/admin/classes', payload);
     },
+    updateClass: function (id, payload) {
+      return patch('/api/admin/classes/' + encodeURIComponent(id), payload);
+    },
     listClasses: function () {
       return get('/api/admin/classes');
     },

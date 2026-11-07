@@ -9,6 +9,7 @@ export type SchoolActivityType =
   | 'teacher.updated'
   | 'teacher.removed'
   | 'class.created'
+  | 'class.updated'
   | 'assessment.submitted'
   | 'assessment.reviewed'
   | 'subscription.payment_submitted';

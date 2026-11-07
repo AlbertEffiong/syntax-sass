@@ -109,6 +109,54 @@ export async function createClass(input: CreateClassInput): Promise<ClassPublic>
 }
 
 /**
+ * Updates an existing class's name, subjects and form teacher. Class names are
+ * unique per school, so a rename cannot collide with another class.
+ */
+export async function updateClass(
+  schoolId: string,
+  classId: string,
+  patch: { className?: string; subjects?: string[]; teacherEmail?: string },
+): Promise<ClassPublic> {
+  const cls = await ClassModel.findById(classId);
+  if (!cls) {
+    throw ApiError.notFound('Class not found.', 'CLASS_NOT_FOUND');
+  }
+  assertSameSchool(cls.schoolId, schoolId);
+
+  if (patch.className !== undefined) {
+    const nextName = patch.className.trim();
+    if (!nextName) {
+      throw ApiError.badRequest('Class name is required.', 'CLASS_NAME_REQUIRED');
+    }
+    const collision = await ClassModel.findOne({
+      schoolId: cls.schoolId,
+      className: nextName,
+      _id: { $ne: cls._id },
+    });
+    if (collision) {
+      throw ApiError.conflict('A class with this name already exists.', 'CLASS_EXISTS');
+    }
+    cls.className = nextName;
+  }
+  if (patch.subjects !== undefined) {
+    const subjects = Array.from(
+      new Set(patch.subjects.map((s) => String(s).trim()).filter(Boolean)),
+    );
+    if (subjects.length === 0) {
+      throw ApiError.badRequest('At least one subject is required.', 'NO_SUBJECTS');
+    }
+    cls.subjects = subjects;
+  }
+  if (patch.teacherEmail !== undefined) {
+    cls.teacherEmail = patch.teacherEmail?.toLowerCase().trim() || undefined;
+  }
+
+  await cls.save();
+  await recordSchoolActivity(schoolId, 'class.updated', 'Class updated', `${cls.className} curriculum was updated.`);
+  return serializeClass(cls);
+}
+
+/**
  * Lists every class (with its curriculum) for the tenant.
  */
 export async function listClasses(schoolId: string): Promise<ClassPublic[]> {

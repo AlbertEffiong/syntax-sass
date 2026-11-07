@@ -574,13 +574,14 @@ function authTeacherForm() {
   return `
     <form data-action="form:teacherlogin">
       <div class="field">
-        <label for="tc-email">Verified Teacher Email</label>
-        <input class="input" id="tc-email" name="email" type="email" placeholder="teacher@your-school.edu" value="teacher@brightfuture.edu" required />
+        <label for="tc-email">Teacher Email</label>
+        <input class="input" id="tc-email" name="email" type="email" placeholder="teacher@yourschool.edu" required />
       </div>
       <div class="field">
         <label for="tc-pass">Password</label>
-        <input class="input" id="tc-pass" name="password" type="password" placeholder="••••••••" placeholder="••••••••" required />
+        <input class="input" id="tc-pass" name="password" type="password" placeholder="••••••••" required />
       </div>
+      <span class="hint">Use the credentials your school admin shared. On first sign-in you will be asked to verify the OTP sent to your email — after that, sign-in is password-only.</span>
       <button type="submit" class="btn btn-primary btn-block" style="padding:12px;margin-top:6px">${ic.userCheck}<span>Sign In to Teacher Portal</span></button>
     </form>`;
 }
@@ -1639,7 +1640,7 @@ function inviteTeacherModal() {
         <div class="field">
           <label for="iv-email">Work Email</label>
           <input class="input" id="iv-email" name="email" type="email" placeholder="teacher@yourschool.edu" required />
-          <span class="hint">An OTP will be sent here. The teacher verifies after signing in with the generated password.</span>
+          <span class="hint">An OTP will be sent here. The teacher signs in with the generated password, then verifies the OTP themselves — the school admin does not need to activate the account.</span>
         </div>
         <div class="field">
           <label>Subjects Handled</label>
@@ -1653,7 +1654,7 @@ function inviteTeacherModal() {
           <div class="field">
             <label for="iv-pass">Generated Sign-in Password</label>
             <input class="input code" id="iv-pass" name="initialPassword" value="${esc(initialPassword)}" readonly required />
-            <span class="hint">Share this password securely with the teacher.</span>
+            <span class="hint">Share this password securely with the teacher. They will verify the OTP on first sign-in.</span>
           </div>
         </div>
       </div>
@@ -1674,7 +1675,7 @@ function teacherInviteCredentialsModal(teacher, password) {
     <div class="modal-body">
       <div class="field"><label>Sign-in Email</label><input class="input" value="${esc(teacher.email)}" readonly /></div>
       <div class="field"><label>Generated Password</label><input class="input code" value="${esc(password)}" readonly /></div>
-      <div class="demo-note">The teacher signs in with these credentials, then enters the OTP from their email. The account stays restricted until they verify.</div>
+      <div class="demo-note">Share these credentials with the teacher. They sign in on the Teacher portal, then enter the OTP from their email to activate the account. Once verified, every future sign-in uses the same password — no OTP is required again.</div>
     </div>
     <div class="modal-foot"><button class="btn btn-primary" data-action="modal:close">Done</button></div>
   `);
@@ -1704,29 +1705,17 @@ function teacherLoginOtpModal(email) {
 function otpModal(t) {
   openModal(`
     <div class="modal-head">
-      <div><h3>Verify Teacher Account</h3><div class="sub">Enter the 6-digit code sent to ${esc(t.email)}</div></div>
+      <div><h3>Resend Verification OTP</h3><div class="sub">A new 6-digit code will be sent to ${esc(t.email)}</div></div>
       <button class="close-x" data-action="modal:close">${ic.x}</button>
     </div>
-    <form data-action="form:otp" data-id="${t.id}">
-      <div class="modal-body">
-        ${t.otp ? `<div class="demo-note" style="margin-bottom:14px"><strong>Development OTP:</strong> ${esc(t.otp)}</div>` : ""}
-        <div class="field">
-          <label for="otp-code">One-Time Password</label>
-          <input class="input" id="otp-code" name="otp" inputmode="numeric" maxlength="6" placeholder="••••••" style="letter-spacing:.4em;text-align:center;font-size:20px;font-weight:700" required />
-          <span class="hint">Verification links this account to ${esc(state.school.name)} and activates sign-in.</span>
-        </div>
-        <div class="field">
-          <label for="otp-password">Create Password</label>
-          <input class="input" id="otp-password" name="password" type="password" minlength="8" autocomplete="new-password" required />
-          <span class="hint">Use at least 8 characters with uppercase, lowercase, a number, and a symbol.</span>
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button type="button" class="btn btn-ghost" data-action="teacher:resendOtp" data-id="${t.id}" style="margin-right:auto">${ic.refresh}<span>Resend OTP</span></button>
-        <button type="button" class="btn btn-ghost" data-action="modal:close">Cancel</button>
-        <button type="submit" class="btn btn-primary">${ic.check}<span>Verify Account</span></button>
-      </div>
-    </form>
+    <div class="modal-body">
+      ${t.otp ? `<div class="demo-note" style="margin-bottom:14px"><strong>Development OTP:</strong> ${esc(t.otp)}</div>` : ""}
+      <p class="cell-muted" style="font-size:13.5px">The teacher will enter this code when they sign in to the Teacher Portal. Verification is done by the teacher — the school admin does not activate the account.</p>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" data-action="modal:close">Cancel</button>
+      <button type="button" class="btn btn-primary" data-action="teacher:resendOtp" data-id="${esc(t.id)}">${ic.refresh}<span>Resend Code</span></button>
+    </div>
   `);
 }
 
@@ -3429,6 +3418,7 @@ document.addEventListener("submit", async (e) => {
     const name = String(data.get("name") || "").trim();
     const subjects = collectSubjects(form);
     const classesTaught = Math.max(1, Number(data.get("classes")) || 1);
+    const initialPassword = String(data.get("initialPassword") || "").trim();
     if (state.teachers.some((t) => (t.email || "").toLowerCase() === email)) {
       toast("Email already invited", "A teacher with that email already exists.", "error");
       return;
@@ -3440,11 +3430,12 @@ document.addEventListener("submit", async (e) => {
           email,
           subject: subjects.join(", "),
           classesTaught,
+          initialPassword,
         });
         const teacher = liveUpsertTeacher(result.teacher);
         teacher.otp = result.otp;
         closeModal();
-        otpModal(teacher);
+        teacherInviteCredentialsModal(teacher, initialPassword);
         toast("Invite sent", `Verification instructions sent to ${email}.`, "success");
       } catch (err) {
         toast("Invite failed", err.message || "Could not invite this teacher.", "error");
@@ -3460,32 +3451,42 @@ document.addEventListener("submit", async (e) => {
       classes: classesTaught,
       status: "Active",
       verified: false,
+      password: initialPassword,
       otp: randomOtp(),
     };
     teacher.subject = teacher.subjects.join(", ");
     state.teachers.unshift(teacher);
     toast("Invite sent", `OTP sent to ${email}.`);
-    otpModal(teacher);
+    teacherInviteCredentialsModal(teacher, initialPassword);
     render();
   }
 
-  if (action === "form:otp") {
+  if (action === "form:teacherOtpLogin") {
     const data = new FormData(form);
-    const teacher = teacherById(form.getAttribute("data-id"));
-    if (!teacher) { closeModal(); return; }
+    const email = String(data.get("email") || "").trim().toLowerCase();
     const entered = String(data.get("otp") || "").trim();
-    const password = String(data.get("password") || "");
+    if (!email || !entered) {
+      toast("Missing details", "Enter your email and the OTP sent to it.", "error");
+      return;
+    }
     if (LIVE_API) {
       try {
-        const activated = await SyntaxApi.auth.verifyOtp({ email: teacher.email, otp: entered, password });
-        liveUpsertTeacher(activated);
-        delete teacher.otp;
-        closeModal();
-        toast("Account verified", `${teacher.name} can now sign in to the Teacher Portal.`, "success");
+        const activated = await SyntaxApi.auth.verifyOtp({ email, otp: entered });
+        const teacher = liveUpsertTeacher(activated);
+        state.auth.tier = "teacher";
+        state.auth.teacher = { loggedIn: true, teacherId: teacher.id, email: teacher.email };
+        await liveLoadTeacherData();
+        saveSession();
+        toast("Account activated", `Welcome, ${teacher.name}. You are now signed in.`, "success");
         render();
       } catch (err) {
-        toast("Verification failed", err.message || "Could not verify this teacher account.", "error");
+        toast("Verification failed", err.message || "Could not activate this teacher account.", "error");
       }
+      return;
+    }
+    const teacher = state.teachers.find((t) => (t.email || "").toLowerCase() === email);
+    if (!teacher) {
+      toast("No invitation found", "No pending invitation matches this email.", "error");
       return;
     }
     if (entered !== teacher.otp) {
@@ -3494,8 +3495,11 @@ document.addEventListener("submit", async (e) => {
     }
     teacher.verified = true;
     delete teacher.otp;
-    closeModal();
-    toast("Account verified", `${teacher.name} can now sign in to the Teacher Portal.`);
+    state.auth.tier = "teacher";
+    state.auth.teacher = { loggedIn: true, teacherId: teacher.id, email: teacher.email };
+    state.school = schoolById(teacher.schoolId) || state.school;
+    saveSession();
+    toast("Account activated", `Welcome, ${teacher.name}. You are now signed in.`, "success");
     render();
   }
 
@@ -3662,6 +3666,27 @@ document.addEventListener("submit", async (e) => {
       return;
     }
     if (id) {
+      if (LIVE_API) {
+        try {
+          const teacherRecord = state.teachers.find((item) =>
+            String(item.schoolId) === String(state.school.id) &&
+            (item.name.toLowerCase() === teacher.toLowerCase() || item.email.toLowerCase() === teacher.toLowerCase()),
+          );
+          const payload = { className: name, subjects };
+          if (teacherRecord) payload.teacherEmail = teacherRecord.email;
+          const saved = await SyntaxApi.admin.updateClass(id, payload);
+          const c = state.classes.find((x) => x.id === id);
+          if (c) Object.assign(c, {
+            name: saved.className,
+            teacher: saved.teacherEmail || "",
+            subjects: saved.subjects || subjects,
+          });
+          toast("Class updated", `${name} and its subjects were saved.`, "success");
+        } catch (err) {
+          toast("Class update failed", err.message || "Could not save this class.", "error");
+        }
+        return;
+      }
       const c = state.classes.find((x) => x.id === id);
       if (c) { Object.assign(c, { name, teacher, subjects }); toast("Class updated", `${name} and its subjects were saved.`); }
     } else {
@@ -4107,7 +4132,8 @@ async function liveLogin(role, form) {
     const code = err && err.code;
     const msg = (err && err.message) || "Sign-in failed.";
     if (code === "OTP_REQUIRED") {
-      toast("Account not verified", "This account is pending OTP verification by the school admin.", "error");
+      const email = (data.get("email") || "").toString().toLowerCase();
+      teacherLoginOtpModal(email);
     } else if (code === "RATE_LIMITED") {
       toast("Too many attempts", "Please wait a moment before trying again.", "error");
     } else {

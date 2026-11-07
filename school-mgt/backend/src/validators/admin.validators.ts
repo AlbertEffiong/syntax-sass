@@ -90,6 +90,21 @@ export const updateTeacherSchema = z
     message: 'Provide at least one field to update.',
   });
 
+/**
+ * Updates an existing class's name, subjects and/or form teacher. At least one
+ * field must be provided.
+ */
+export const updateClassSchema = z
+  .object({
+    className: z.string().min(1).trim().optional(),
+    subjects: z.array(z.string().trim().min(1)).min(1).optional(),
+    teacherEmail: emailSchema.optional(),
+  })
+  .refine(
+    (v) => v.className !== undefined || v.subjects !== undefined || v.teacherEmail !== undefined,
+    { message: 'Provide at least one field to update.' },
+  );
+
 export const academicSettingSchema = z.object({
   currentSession: z.string().trim().min(1).optional(),
   currentTerm: z.string().trim().min(1).optional(),
@@ -103,5 +118,6 @@ export type RecordFeePaymentBody = z.infer<typeof recordFeePaymentSchema>;
 export type DebtorControlBody = z.infer<typeof debtorControlSchema>;
 export type ReviewAssessmentBody = z.infer<typeof reviewAssessmentSchema>;
 export type AdminBankTransferBody = z.infer<typeof adminBankTransferSchema>;
+export type UpdateClassBody = z.infer<typeof updateClassSchema>;
 export type UpdateTeacherBody = z.infer<typeof updateTeacherSchema>;
 export type AcademicSettingBody = z.infer<typeof academicSettingSchema>;

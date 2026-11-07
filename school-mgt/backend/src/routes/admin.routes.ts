@@ -14,6 +14,7 @@ import {
   reviewAssessmentSchema,
   updateTeacherSchema,
   updateStudentSchema,
+  updateClassSchema,
   recordFeePaymentSchema,
   debtorControlSchema,
 } from '../validators/admin.validators';
@@ -30,8 +31,9 @@ router.patch('/debtor-control', validate(debtorControlSchema), adminController.u
 router.patch('/academic-setting', validate(academicSettingSchema), adminController.updateAcademicSetting);
 
 // --- Classes (curriculum source of truth) ---
-router.post('/classes', validate(createClassSchema), adminController.createClass);
-router.get('/classes', adminController.listClasses);
+  router.post('/classes', validate(createClassSchema), adminController.createClass);
+  router.patch('/classes/:id', validate(idParamsSchema, 'params'), validate(updateClassSchema), adminController.updateClass);
+  router.get('/classes', adminController.listClasses);
 
 // --- Students ---
 router.post('/students', validate(enrollStudentSchema), adminController.enrollStudent);
