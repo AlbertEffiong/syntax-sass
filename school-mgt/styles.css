@@ -1241,3 +1241,7 @@ body.nav-open { overflow: hidden; }
 @media (pointer: coarse) {
   .seg-tab { min-height: 44px; }
 }
+
+.pw-wrap { position: relative; }
+.pw-wrap .input { padding-right: 42px; }
+.pw-toggle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--muted); font-size: 16px; line-height: 1; padding: 4px; }

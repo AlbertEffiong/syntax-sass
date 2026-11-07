@@ -4490,3 +4490,30 @@ document.addEventListener("keydown", (e) => {
     entry.value = "";
   }
 });
+
+(function enhancePasswordFields() {
+  function wrap(input) {
+    if (input.dataset.pwWrapped) return;
+    input.dataset.pwWrapped = "1";
+    const wrap = document.createElement("div");
+    wrap.className = "pw-wrap";
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "pw-toggle";
+    btn.setAttribute("aria-label", "Toggle password visibility");
+    btn.textContent = "👁";
+    btn.addEventListener("click", () => {
+      if (input.type === "password") { input.type = "text"; btn.textContent = "🙈"; }
+      else { input.type = "password"; btn.textContent = "👁"; }
+    });
+    wrap.appendChild(btn);
+  }
+  function scan(root) {
+    (root || document).querySelectorAll('input[type="password"]').forEach(wrap);
+  }
+  const obs = new MutationObserver(() => scan(document));
+  obs.observe(document.documentElement, { childList: true, subtree: true });
+  scan(document);
+})();
