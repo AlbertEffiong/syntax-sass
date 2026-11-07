@@ -48,12 +48,19 @@ export const inviteTeacher = asyncHandler(async (req: Request, res: Response) =>
 
 /**
  * POST /api/auth/verify-otp
- * Activates a teacher using the OTP and sets their password.
+ * Activates a teacher using the OTP and sets their password. Establishes a
+ * session so the teacher is immediately signed in after verification.
  */
 export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as VerifyOtpBody;
   const teacher = await authService.activateTeacherWithOtp(body);
-  return ok(res, teacher, 'Teacher account activated successfully.');
+  const session = establishSession(res, {
+    id: teacher.id,
+    role: 'teacher',
+    schoolId: teacher.schoolId,
+    email: teacher.email,
+  });
+  return ok(res, { user: teacher, token: session.token, csrfToken: session.csrfToken }, 'Teacher account activated successfully.');
 });
 
 /**

@@ -1688,6 +1688,7 @@ function teacherLoginOtpModal(email) {
       <button class="close-x" data-action="modal:close">${ic.x}</button>
     </div>
     <form data-action="form:teacherOtpLogin">
+      <input type="hidden" name="email" value="${esc(email)}" />
       <div class="modal-body">
         <div class="field">
           <label for="teacher-login-otp">Email OTP</label>
@@ -1705,17 +1706,14 @@ function teacherLoginOtpModal(email) {
 function otpModal(t) {
   openModal(`
     <div class="modal-head">
-      <div><h3>Resend Verification OTP</h3><div class="sub">A new 6-digit code will be sent to ${esc(t.email)}</div></div>
+      <div><h3>Verification OTP</h3><div class="sub">Latest code sent to ${esc(t.email)}</div></div>
       <button class="close-x" data-action="modal:close">${ic.x}</button>
     </div>
     <div class="modal-body">
       ${t.otp ? `<div class="demo-note" style="margin-bottom:14px"><strong>Development OTP:</strong> ${esc(t.otp)}</div>` : ""}
-      <p class="cell-muted" style="font-size:13.5px">The teacher will enter this code when they sign in to the Teacher Portal. Verification is done by the teacher — the school admin does not activate the account.</p>
+      <p class="cell-muted" style="font-size:13.5px">The teacher enters this code when they sign in to the Teacher Portal. Verification is done by the teacher — the school admin does not activate the account. Need a new code? Use the <strong>Resend OTP</strong> action in the staff register.</p>
     </div>
-    <div class="modal-foot">
-      <button type="button" class="btn btn-ghost" data-action="modal:close">Cancel</button>
-      <button type="button" class="btn btn-primary" data-action="teacher:resendOtp" data-id="${esc(t.id)}">${ic.refresh}<span>Resend Code</span></button>
-    </div>
+    <div class="modal-foot"><button class="btn btn-primary" data-action="modal:close">Done</button></div>
   `);
 }
 
@@ -3472,7 +3470,7 @@ document.addEventListener("submit", async (e) => {
     if (LIVE_API) {
       try {
         const activated = await SyntaxApi.auth.verifyOtp({ email, otp: entered });
-        const teacher = liveUpsertTeacher(activated);
+        const teacher = liveUpsertTeacher(activated.user);
         state.auth.tier = "teacher";
         state.auth.teacher = { loggedIn: true, teacherId: teacher.id, email: teacher.email };
         await liveLoadTeacherData();

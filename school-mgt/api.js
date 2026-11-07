@@ -199,7 +199,7 @@
       return post('/api/auth/invite-teacher', payload);
     },
     verifyOtp: function (payload) {
-      return post('/api/auth/verify-otp', payload);
+      return post('/api/auth/verify-otp', payload).then(captureToken);
     },
     me: function () {
       return get('/api/auth/me').then(captureToken);
