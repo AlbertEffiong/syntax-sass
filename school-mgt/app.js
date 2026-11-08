@@ -4067,7 +4067,10 @@ document.addEventListener("submit", async (e) => {
     const affectiveOut = [];
     const psychomotorOut = [];
     for (const e of selectEntries) {
-      const entry = { trait: e.trait, rating: e.rating };
+      const trait = String(e.trait || "").trim();
+      const rating = String(e.rating || "").trim();
+      if (!trait || !rating) continue; // "Not rated" / empty — omit (backend schema requires non-empty rating)
+      const entry = { trait, rating };
       if (e.kind === "affective") affectiveOut.push(entry); else psychomotorOut.push(entry);
     }
     const payload = { affective: affectiveOut, psychomotor: psychomotorOut };
