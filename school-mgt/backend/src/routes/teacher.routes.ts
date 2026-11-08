@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as teacherController from '../controllers/teacherController';
+import * as traitController from '../controllers/traitController';
 import { authenticate, authorize } from '../middleware/auth';
 import { enforceTenant } from '../middleware/tenant';
 import { validate } from '../middleware/validate';
@@ -8,6 +9,9 @@ import {
   saveBroadsheetSchema,
   submitBroadsheetSchema,
   rosterQuerySchema,
+  studentIdParamsSchema,
+  studentTraitsQuerySchema,
+  upsertStudentTraitsSchema,
 } from '../validators/teacher.validators';
 
 const router = Router();
@@ -47,6 +51,30 @@ router.post(
   '/broadsheet/submit',
   validate(submitBroadsheetSchema),
   teacherController.submitBroadsheet,
+);
+
+/**
+ * @route  GET /api/teacher/students/:studentId/traits
+ * @desc   Affective & psychomotor trait ratings for a student (term/session).
+ * @access Teacher
+ */
+router.get(
+  '/students/:studentId/traits',
+  validate(studentIdParamsSchema, 'params'),
+  validate(studentTraitsQuerySchema, 'query'),
+  traitController.getTraits,
+);
+
+/**
+ * @route  POST /api/teacher/students/:studentId/traits
+ * @desc   Upsert affective & psychomotor trait ratings for a student.
+ * @access Teacher
+ */
+router.post(
+  '/students/:studentId/traits',
+  validate(studentIdParamsSchema, 'params'),
+  validate(upsertStudentTraitsSchema),
+  traitController.upsertTraits,
 );
 
 export default router;

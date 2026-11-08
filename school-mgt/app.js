@@ -1332,6 +1332,11 @@ function studentModal(st) {
             ${err("contact")}
           </div>
         </div>
+        <div class="field">
+          <label for="st-email">Student / Parent Email</label>
+          <input class="input" id="st-email" name="email" type="email" value="${esc(st.email || "")}" placeholder="e.g. parent@example.com" />
+          <span class="hint">Login credentials (Student ID + password) are emailed here when the student is enrolled or the password is reset.</span>
+        </div>
         <div class="input-group">
           <div class="field">
             <label for="st-cls">Current Class</label>
@@ -1837,6 +1842,43 @@ function otpModal(t) {
   `);
 }
 
+function studentTraitsModal(studentId, studentName, traits) {
+  const affective = Array.isArray(traits && traits.affective) ? traits.affective : [];
+  const psychomotor = Array.isArray(traits && traits.psychomotor) ? traits.psychomotor : [];
+  const ratingOf = (list, trait) => {
+    const r = list.find((x) => String(x.trait || "").toLowerCase() === String(trait).toLowerCase());
+    return r ? String(r.rating || "") : "";
+  };
+  const stdAffective = ["Punctuality", "Neatness", "Politeness", "Honesty", "Attentiveness", "Leadership"];
+  const stdPsychomotor = ["Handwriting", "Verbal Fluency", "Sports", "Drawing & Painting", "Handling Tools", "Musical Skills"];
+  const ratings = ["", "Excellent", "Very Good", "Good", "Fair", "Poor"];
+  const traitSelect = (kind, trait) => {
+    const sel = ratingOf(kind === "affective" ? affective : psychomotor, trait);
+    return `<select class="select" data-kind="${kind}" data-trait="${esc(trait)}">${ratings.map((r) => `<option value="${esc(r)}" ${r === sel ? "selected" : ""}>${esc(r) || "Not rated"}</option>`).join("")}</select>`;
+  };
+  const affectiveRows = stdAffective.map((t) => `<div class="trait-row"><span class="cell-muted">${esc(t)}</span><div style="text-align:right">${traitSelect("affective", t)}</div></div>`).join("");
+  const psychomotorRows = stdPsychomotor.map((t) => `<div class="trait-row"><span class="cell-muted">${esc(t)}</span><div style="text-align:right">${traitSelect("psychomotor", t)}</div></div>`).join("");
+  const term = state.teacherTerm || "First Term";
+  const session = state.teacherSession || "";
+  openModal(`
+    <div class="modal-head">
+      <div><h3>Student Traits</h3><div class="sub">${esc(studentName)} · ${esc(studentId)}</div></div>
+      <button class="close-x" data-action="modal:close">${ic.x}</button>
+    </div>
+    <form data-action="form:saveTraits" data-student-id="${esc(studentId)}" data-term="${esc(term)}" data-session="${esc(session)}">
+      <div class="modal-body">
+        <div class="field"><label>Affective Traits</label><div class="trait-grid">${affectiveRows}</div></div>
+        <div class="field" style="margin-top:12px"><label>Psychomotor Traits</label><div class="trait-grid">${psychomotorRows}</div></div>
+        <span class="hint">Ratings are saved for ${esc(term)} ${esc(session)} and appear on the student's report card.</span>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" data-action="modal:close">Cancel</button>
+        <button type="submit" class="btn btn-primary">${ic.check}<span>Save Traits</span></button>
+      </div>
+    </form>
+  `);
+}
+
 function adminClasses() {
   const list = schoolClassList();
   return `
@@ -2223,18 +2265,20 @@ function teacherApp() {
         </div>`;
 
   const bodyRows = rows.map((r, i) => {
+    if (!r) return `<tr><td colspan="8" class="cell-muted">—</td></tr>`;
     const hasAny = ["ca1", "ca2", "exam"].some((k) => r[k] !== "" && r[k] !== null && r[k] !== undefined);
     const total = hasAny ? Number(r.ca1 || 0) + Number(r.ca2 || 0) + Number(r.exam || 0) : "";
     const g = hasAny ? gradeFor(total) : "";
     return `
       <tr>
         <td class="cell-muted col-idx">${i + 1}</td>
-        <td class="cell-strong col-name">${esc(r.name)}</td>
-        <td><input class="input score-input" style="padding:7px 9px;max-width:82px" type="number" min="0" max="20" data-i="${i}" data-k="ca1" value="${r.ca1}" placeholder="0" /></td>
-        <td><input class="input score-input" style="padding:7px 9px;max-width:82px" type="number" min="0" max="20" data-i="${i}" data-k="ca2" value="${r.ca2}" placeholder="0" /></td>
-        <td><input class="input score-input" style="padding:7px 9px;max-width:82px" type="number" min="0" max="60" data-i="${i}" data-k="exam" value="${r.exam}" placeholder="0" /></td>
+        <td class="cell-strong col-name">${esc(r?.name || "")}</td>
+        <td><input class="input score-input" style="padding:7px 9px;max-width:82px" type="number" min="0" max="20" data-i="${i}" data-k="ca1" value="${r?.ca1 ?? ""}" placeholder="0" /></td>
+        <td><input class="input score-input" style="padding:7px 9px;max-width:82px" type="number" min="0" max="20" data-i="${i}" data-k="ca2" value="${r?.ca2 ?? ""}" placeholder="0" /></td>
+        <td><input class="input score-input" style="padding:7px 9px;max-width:82px" type="number" min="0" max="60" data-i="${i}" data-k="exam" value="${r?.exam ?? ""}" placeholder="0" /></td>
         <td class="cell-strong" data-total="${i}">${total === "" ? "—" : total}</td>
         <td data-grade="${i}">${gradeBadge(g)}</td>
+        <td class="cell-muted" style="text-align:center"><button type="button" class="icon-btn" data-action="teacher:traits" data-student-id="${esc((r && (r.dbId || r.studentId)) || "")}" data-student-name="${esc(r?.name || "")}" title="Set Affective &amp; Psychomotor traits">${ic.edit}</button></td>
       </tr>`;
   }).join("");
 
@@ -2253,7 +2297,7 @@ function teacherApp() {
       <div class="table-wrap">
         <table class="data broadsheet">
           <thead>
-            <tr><th class="col-idx">#</th><th class="col-name">Student</th><th>CA1</th><th>CA2</th><th>Exam</th><th>Total</th><th>Grade</th></tr>
+            <tr><th class="col-idx">#</th><th class="col-name">Student</th><th>CA1</th><th>CA2</th><th>Exam</th><th>Total</th><th>Grade</th><th style="width:130px">Traits</th></tr>
           </thead>
           <tbody id="score-body">${bodyRows}</tbody>
         </table>
@@ -2457,19 +2501,12 @@ const RESULT_SUBJECTS = [
   { subject: "French", ca: 31, exam: 45 },
   { subject: "Physical & Health Education", ca: 39, exam: 57 },
 ];
-const AFFECTIVE = [
-  ["Punctuality", "Excellent"], ["Neatness", "Very Good"], ["Politeness", "Excellent"],
-  ["Honesty", "Very Good"], ["Attentiveness", "Good"], ["Leadership", "Very Good"],
-];
-const PSYCHOMOTOR = [
-  ["Handwriting", "Very Good"], ["Verbal Fluency", "Good"], ["Sports", "Excellent"],
-  ["Drawing & Painting", "Good"], ["Handling Tools", "Good"], ["Musical Skills", "Fair"],
-];
 
 function principalName(school) {
   const s = school || state.school;
-  const val = s && s.principal ? String(s.principal).trim() : "";
-  return val || "A. Bello";
+  if (!s) return "";
+  const val = String(s.principalName || s.principal || "").trim();
+  return val;
 }
 
 /* Pull a single student's subject result straight from the Teacher Broadsheet dataset */
@@ -2647,6 +2684,13 @@ function studentResult() {
       <td class="cell-muted">${remarkForGrade(row.grade)}</td>
     </tr>`).join("");
 
+  const affectiveList = LIVE_API
+    ? (liveReport?.affective || []).map((t) => [t.trait || "", t.rating || ""])
+    : (st && Array.isArray(st.affective) ? st.affective.map((t) => [t.trait || "", t.rating || ""]) : []);
+  const psychomotorList = LIVE_API
+    ? (liveReport?.psychomotor || []).map((t) => [t.trait || "", t.rating || ""])
+    : (st && Array.isArray(st.psychomotor) ? st.psychomotor.map((t) => [t.trait || "", t.rating || ""]) : []);
+
   return `
   <div class="page result-shell">
     <div class="result-actions">
@@ -2708,11 +2752,11 @@ function studentResult() {
 
         <h4 class="section">Affective &amp; Psychomotor Traits</h4>
         <div class="traits-grid" style="margin-bottom:6px">
-          ${AFFECTIVE.map(([k, v]) => `<div class="trait"><span class="cell-muted">${k}</span><span class="rating">${v}</span></div>`).join("")}
+          ${affectiveList.map(([k, v]) => `<div class="trait"><span class="cell-muted">${esc(k)}</span><span class="rating">${esc(v || "Not rated")}</span></div>`).join("")}
         </div>
         <div style="height:14px"></div>
         <div class="traits-grid">
-          ${PSYCHOMOTOR.map(([k, v]) => `<div class="trait"><span class="cell-muted">${k}</span><span class="rating">${v}</span></div>`).join("")}
+          ${psychomotorList.map(([k, v]) => `<div class="trait"><span class="cell-muted">${esc(k)}</span><span class="rating">${esc(v || "Not rated")}</span></div>`).join("")}
         </div>
 
         <h4 class="section">Class Teacher's Remark</h4>
@@ -3287,6 +3331,29 @@ document.addEventListener("click", async (e) => {
       break;
     }
 
+    case "teacher:traits": {
+      const studentId = btn.getAttribute("data-student-id");
+      const studentName = btn.getAttribute("data-student-name") || "";
+      (async () => {
+        let traits = { affective: [], psychomotor: [] };
+        if (LIVE_API) {
+          try {
+            traits = await SyntaxApi.teacher.traits.get(studentId, {
+              term: state.teacherTerm || "First Term",
+              session: state.teacherSession || "",
+            });
+          } catch (e) {
+            /* start with blank traits */
+          }
+        } else {
+          const st = state.students.find((s) => s.id === studentId);
+          if (st) traits = { affective: st.affective || [], psychomotor: st.psychomotor || [] };
+        }
+        studentTraitsModal(studentId, studentName, traits);
+      })();
+      break;
+    }
+
     case "class:new":
       classModal();
       break;
@@ -3495,11 +3562,17 @@ document.addEventListener("input", (e) => {
   const pr = e.target.closest('[data-action="principal:set"]');
   if (pr) {
     const val = String(pr.value || "").trim();
-    if (state.school) state.school.principal = val;
+    if (state.school) {
+      state.school.principalName = val;
+      state.school.principal = val;
+    }
     const rec = state.schools.find((x) => x.id === (state.school && state.school.id));
-    if (rec) rec.principal = val;
+    if (rec) {
+      rec.principalName = val;
+      rec.principal = val;
+    }
     const sig = document.querySelector("#pr-sign-name");
-    if (sig) sig.textContent = val || "A. Bello";
+    if (sig) sig.textContent = val;
     return;
   }
   const el = e.target.closest(".score-input");
@@ -3749,6 +3822,7 @@ document.addEventListener("submit", async (e) => {
     const dob = String(data.get("dob") || "").trim();
     const guardian = String(data.get("guardian") || "").trim();
     const contact = String(data.get("contact") || "").trim();
+    const email = String(data.get("email") || "").trim();
     const selectedClass = String(data.get("cls") || "").trim();
     const selectedClassRecord = LIVE_API
       ? state.classes.find((item) => String(item.id) === selectedClass && String(item.schoolId) === String(state.school.id))
@@ -3785,7 +3859,7 @@ document.addEventListener("submit", async (e) => {
       toast("Check fee amounts", "Outstanding fees cannot exceed the expected fee.", "error");
       return;
     }
-    const bio = { name, gender, dob, guardian, contact, address, cls, due, paid: due === 0, feeExpected, password };
+    const bio = { name, gender, dob, guardian, contact, email, address, cls, due, paid: due === 0, feeExpected, password };
     if (LIVE_API) {
       try {
         const payload = {
@@ -3796,6 +3870,7 @@ document.addEventListener("submit", async (e) => {
           ...(LIVE_API && selectedClassRecord ? { classId: selectedClassRecord.id } : {}),
           guardian,
           contact,
+          email,
           address,
           feeExpected,
           feeDue: due,
@@ -3805,6 +3880,7 @@ document.addEventListener("submit", async (e) => {
           ? await SyntaxApi.admin.updateStudent(state.students.find((student) => student.id === sid)?.dbId, payload)
           : await SyntaxApi.admin.enrollStudent({ ...payload, password });
         const student = liveUpsertStudent(saved);
+        if (student && password) student.password = password;
         closeModal();
         await liveLoadAdminData();
         if (sid) toast("Student updated", `${student.name}'s school record has been saved.`);
@@ -3903,12 +3979,75 @@ document.addEventListener("submit", async (e) => {
     const password = String(data.get("password") || "").trim();
     clearFieldErrors(form);
     if (password.length < 6) { formFieldError(form, "password", "Password must be at least 6 characters."); toast("Password too short", "Use at least 6 characters.", "error"); return; }
+    if (LIVE_API) {
+      try {
+        if (!st.dbId) throw new Error("This student record is not linked to the backend.");
+        await SyntaxApi.admin.updateStudent(st.dbId, { password });
+        closeModal();
+        const to = st.email || "the email on file";
+        toast("Password updated", `${st.name} can sign in with the new password. Credentials emailed to ${esc(to)}.`);
+        render();
+      } catch (err) {
+        toast("Password reset failed", err.message || "Could not reset this password.", "error");
+      }
+      return;
+    }
     st.password = password;
     closeModal();
     toast("Password updated", `${st.name} can sign in with the new password.`);
     render();
   }
 
+  if (action === "form:saveTraits") {
+    const data = new FormData(form);
+    const studentId = form.getAttribute("data-student-id");
+    const term = form.getAttribute("data-term");
+    const session = form.getAttribute("data-session");
+    const affective = [];
+    const psychomotor = [];
+    for (const [k, v] of data.entries()) {
+      if (k.startsWith("trait:")) {
+        const kind = k.replace("trait:", "");
+        const trait = String(v).trim();
+        if (!trait) continue;
+        (kind === "affective" ? affective : psychomotor).push({ trait, rating: "" });
+      }
+    }
+    // ratings were collected per-select via data-kind/data-trait; rebuild from selects
+    const selectEntries = [];
+    for (const sel of form.querySelectorAll("select")) {
+      selectEntries.push({ kind: sel.getAttribute("data-kind"), trait: sel.getAttribute("data-trait"), rating: sel.value });
+    }
+    const affectiveOut = [];
+    const psychomotorOut = [];
+    for (const e of selectEntries) {
+      const entry = { trait: e.trait, rating: e.rating };
+      if (e.kind === "affective") affectiveOut.push(entry); else psychomotorOut.push(entry);
+    }
+    const payload = { affective: affectiveOut, psychomotor: psychomotorOut };
+    clearFieldErrors(form);
+    if (LIVE_API) {
+      (async () => {
+        try {
+          await SyntaxApi.teacher.traits.upsert(studentId, { ...payload, term, session });
+          closeModal();
+          toast("Traits saved", `${studentId} traits saved for ${esc(term)} ${esc(session)}.`);
+          render();
+        } catch (err) {
+          toast("Failed to save traits", err.message || "Could not save student traits.", "error");
+        }
+      })();
+    } else {
+      const st = state.students.find((s) => s.id === studentId || s.studentId === studentId);
+      if (st) {
+        st.affective = affectiveOut;
+        st.psychomotor = psychomotorOut;
+      }
+      closeModal();
+      toast("Traits saved", `${studentId} traits saved for ${esc(term)} ${esc(session)}.`);
+      render();
+    }
+  }
 
   if (action === "form:class") {
     const data = new FormData(form);
@@ -4215,11 +4354,12 @@ function liveUpsertStudent(u) {
     dob: u.dob ? String(u.dob).slice(0, 10) : "",
     guardian: u.guardian || "",
     contact: u.contact || "",
+    email: u.email || "",
     address: u.address || "",
     cls: u.currentClass || "",
     entryCls: u.currentClass || "",
     enrolledYear: Number(parts[1]) || new Date().getFullYear(),
-    password: "",
+    password: u.password || (existing ? existing.password : "") || "",
     pin: "",
     feeExpected: Number(u.feeExpected) || 0,
     feeCollected: Number(u.feeCollected) || 0,
@@ -4321,8 +4461,10 @@ async function liveLoadTeacherBroadsheet(className, subject) {
   const rows = roster.map((student) => {
     const saved = scoreById.get(String(student.studentId).toUpperCase());
     liveUpsertStudent({ ...student, schoolId: state.school.id });
+    const stRec = state.students.find((s) => s.studentId === student.studentId);
     return {
       studentId: student.studentId,
+      dbId: stRec ? stRec.dbId : null,
       name: student.fullName,
       ca1: saved ? saved.ca1 : "",
       ca2: saved ? saved.ca2 : "",

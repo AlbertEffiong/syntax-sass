@@ -266,6 +266,11 @@ table.data tbody tr:hover { background: #fafbff; }
 .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 .toolbar .field { margin-bottom: 0; min-width: 190px; flex: 1 1 190px; }
 
+.trait-grid { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin-top: 8px; }
+.trait-row { display: contents; align-items: center; border-bottom: 1px solid var(--border); padding: 6px 0; }
+.trait-row .cell-muted { font-size: 13px; color: var(--muted); }
+.trait-row select { width: 150px; max-width: 100%; padding: 8px 10px; font-size: 13px; }
+
 /* Toggle switch */
 .switch { position: relative; display: inline-flex; align-items: center; gap: 12px; cursor: pointer; }
 .switch input { position: absolute; opacity: 0; width: 0; height: 0; }

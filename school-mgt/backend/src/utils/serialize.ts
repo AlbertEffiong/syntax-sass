@@ -120,6 +120,7 @@ export interface StudentPublic {
   currentClass: string;
   guardian: string;
   contact: string;
+  email: string;
   address: string;
   feeExpected: number;
   feeCollected: number;
@@ -134,10 +135,11 @@ export function serializeStudent(student: IStudentDocument): StudentPublic {
     fullName: student.fullName,
     gender: student.gender,
     dob: student.dob,
-    currentClass: student.currentClass,
-    guardian: student.guardian,
-    contact: student.contact,
-    address: student.address,
+  currentClass: student.currentClass,
+  guardian: student.guardian,
+  contact: student.contact,
+  email: student.email,
+  address: student.address,
     feeExpected: student.feeExpected,
     feeCollected: student.feeCollected,
     feeDue: student.feeDue,
@@ -195,5 +197,29 @@ export function serializeAssessment(a: IAssessmentDocument): AssessmentPublic {
     submittedAt: a.submittedAt,
     approvedAt: a.approvedAt,
     note: a.note,
+  };
+}
+
+export interface StudentTraitPublic {
+  studentId: string;
+  term: string;
+  session: string;
+  affective: { trait: string; rating: string }[];
+  psychomotor: { trait: string; rating: string }[];
+}
+
+export function serializeStudentTrait(trait: {
+  studentId: string;
+  term: string;
+  session: string;
+  affective: { trait: string; rating: string }[];
+  psychomotor: { trait: string; rating: string }[];
+}): StudentTraitPublic {
+  return {
+    studentId: trait.studentId,
+    term: trait.term,
+    session: trait.session,
+    affective: trait.affective,
+    psychomotor: trait.psychomotor,
   };
 }

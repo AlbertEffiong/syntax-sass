@@ -29,5 +29,27 @@ export const rosterQuerySchema = z.object({
   classId: objectIdSchema,
 });
 
+const traitRatingSchema = z.object({
+  trait: z.string().trim().min(1, 'Trait name is required.'),
+  rating: z.string().trim().min(1, 'Rating is required.'),
+});
+
+export const studentIdParamsSchema = z.object({
+  studentId: objectIdSchema,
+});
+
+export const studentTraitsQuerySchema = z.object({
+  term: z.string().trim().min(1).optional(),
+  session: z.string().trim().min(1).optional(),
+});
+
+export const upsertStudentTraitsSchema = z.object({
+  term: z.string().trim().min(1, 'Term is required.'),
+  session: z.string().trim().min(1, 'Session is required.'),
+  affective: z.array(traitRatingSchema).default([]),
+  psychomotor: z.array(traitRatingSchema).default([]),
+});
+
 export type SaveBroadsheetBody = z.infer<typeof saveBroadsheetSchema>;
 export type SubmitBroadsheetBody = z.infer<typeof submitBroadsheetSchema>;
+export type UpsertStudentTraitsBody = z.infer<typeof upsertStudentTraitsSchema>;

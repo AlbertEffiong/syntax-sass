@@ -39,6 +39,8 @@ export interface IStudent {
   currentClass: string;
   guardian: string;
   contact: string;
+  /** Email address used to deliver login credentials (student / parent portal). */
+  email: string;
   address: string;
   feeExpected: number;
   feeCollected: number;
@@ -90,9 +92,11 @@ const studentSchema = new Schema<IStudentDocument>(
     gender: { type: String, enum: ['Male', 'Female'], required: true },
     dob: { type: Date, required: true },
     currentClass: { type: String, required: true, trim: true },
-    guardian: { type: String, trim: true, default: '' },
-    contact: { type: String, trim: true, default: '' },
-    address: { type: String, trim: true, default: '' },
+  guardian: { type: String, trim: true, default: '' },
+  contact: { type: String, trim: true, default: '' },
+  /** Email address used to deliver login credentials (student / parent portal). */
+  email: { type: String, trim: true, lowercase: true, default: '' },
+  address: { type: String, trim: true, default: '' },
     feeExpected: { type: Number, min: 0, default: 0 },
     feeCollected: { type: Number, min: 0, default: 0 },
     feeDue: { type: Number, min: 0, default: 0 },

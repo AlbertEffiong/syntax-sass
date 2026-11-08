@@ -1,5 +1,6 @@
 import { School } from '../models/School';
 import { Student, IStudentDocument } from '../models/Student';
+import { StudentTrait } from '../models/StudentTrait';
 import { Teacher } from '../models/Teacher';
 import { Assessment } from '../models/Assessment';
 import { ApiError } from '../utils/ApiError';
@@ -39,6 +40,8 @@ export interface ReportCard {
   classSize: number;
   principalName: string;
   classTeacherName: string;
+  affective: { trait: string; rating: string }[];
+  psychomotor: { trait: string; rating: string }[];
   published: boolean;
 }
 
@@ -69,6 +72,15 @@ export async function getResults(input: GetResultsInput): Promise<ReportCard> {
   }
   const { term, session } = await resolveTermSession(input, school?.academic);
 
+  const traits = await StudentTrait.findOne({
+    schoolId: input.schoolId,
+    studentRef: student._id,
+    term,
+    session,
+  }).lean();
+  const affective = Array.isArray(traits?.affective) ? traits.affective : [];
+  const psychomotor = Array.isArray(traits?.psychomotor) ? traits.psychomotor : [];
+
   const assessments = await Assessment.find({
     schoolId: input.schoolId,
     studentRef: student._id,
@@ -78,7 +90,7 @@ export async function getResults(input: GetResultsInput): Promise<ReportCard> {
   });
 
   if (assessments.length === 0) {
-    return buildFromHistory(student, term, session, school?.principalName ?? '', input.schoolId, school?.name ?? '');
+    return buildFromHistory(student, term, session, school?.principalName ?? '', input.schoolId, school?.name ?? '', affective, psychomotor);
   }
 
   // Resolve dynamic teacher names for each subject.
@@ -134,6 +146,8 @@ export async function getResults(input: GetResultsInput): Promise<ReportCard> {
     classSize,
     principalName,
     classTeacherName: classTeacherNames[0] ?? '',
+    affective,
+    psychomotor,
     published: true,
   };
 }
@@ -197,6 +211,8 @@ function buildFromHistory(
   principalNameFromSchool: string,
   schoolId: string,
   schoolName: string,
+  affective: { trait: string; rating: string }[],
+  psychomotor: { trait: string; rating: string }[],
 ): ReportCard {
   const doc = student;
   const history =
@@ -240,6 +256,8 @@ function buildFromHistory(
     classSize: history.classSize,
     principalName: history.principalName || principalNameFromSchool,
     classTeacherName: history.classTeacherName,
+    affective,
+    psychomotor,
     published: true,
   };
 }

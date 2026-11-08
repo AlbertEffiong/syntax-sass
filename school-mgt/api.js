@@ -314,6 +314,14 @@
     submitBroadsheet: function (payload) {
       return post('/api/teacher/broadsheet/submit', payload);
     },
+    traits: {
+      get: function (studentId, params) {
+        return get('/api/teacher/students/' + encodeURIComponent(studentId) + '/traits' + buildQuery(params));
+      },
+      upsert: function (studentId, payload) {
+        return post('/api/teacher/students/' + encodeURIComponent(studentId) + '/traits', payload);
+      },
+    },
   };
 
   var student = {

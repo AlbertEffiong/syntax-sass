@@ -43,6 +43,7 @@ export interface EnrollStudentInput {
   password: string;
   guardian?: string;
   contact?: string;
+  email?: string;
   address?: string;
   feeExpected?: number;
   feeDue?: number;
@@ -215,7 +216,8 @@ export async function enrollStudent(input: EnrollStudentInput): Promise<StudentP
   });
 
   await cache.invalidatePrefix(`students:${input.schoolId}:`);
-  if (input.contact && input.contact.includes('@')) await sendStudentCredentials(input.contact, studentId, input.password, (await School.findById(input.schoolId))?.name ?? 'your school');
+  const recipient = input.email || (input.contact && input.contact.includes('@') ? input.contact : '');
+  if (recipient) await sendStudentCredentials(recipient, studentId, input.password, school.name);
   await recordSchoolActivity(input.schoolId, 'student.enrolled', 'Student enrolled', `${student.fullName} enrolled in ${student.currentClass}.`);
   return serializeStudent(student);
 }
@@ -249,6 +251,13 @@ export async function updateStudent(
 
   await student.save();
   await cache.invalidatePrefix(`students:${schoolId}:`);
+  // Deliver login credentials whenever the password is (re)generated so the
+  // student/parent can sign in. The plaintext password is only used for the
+  // email and is never written to logs.
+  if (patch.password && student.email) {
+    const school = await School.findById(schoolId);
+    await sendStudentCredentials(student.email, student.studentId, patch.password, school?.name ?? 'your school');
+  }
   await recordSchoolActivity(schoolId, 'student.updated', 'Student record updated', `${student.fullName}'s record was updated.`);
   return serializeStudent(student);
 }
