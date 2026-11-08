@@ -54,10 +54,17 @@ export const debtorControlSchema = z.object({
 });
 
 export const reviewAssessmentSchema = z.object({
-  assessmentId: objectIdSchema,
+  assessmentId: objectIdSchema.optional(),
+  classId: objectIdSchema.optional(),
+  subject: z.string().trim().min(1).optional(),
+  term: z.string().trim().min(1).optional(),
+  session: z.string().trim().min(1).optional(),
   action: z.enum(['approve', 'reject']),
   note: z.string().trim().max(500).optional(),
-});
+}).refine(
+  (v) => v.assessmentId || (v.classId && v.subject && v.term && v.session),
+  { message: 'Provide assessmentId or classId+subject+term+session.' },
+);
 
 export const adminBankTransferSchema = z.object({
   reference: z.string().trim().min(3, 'A payment reference is required.'),

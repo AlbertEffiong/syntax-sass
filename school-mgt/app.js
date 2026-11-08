@@ -1013,7 +1013,7 @@ function adminApp() {
         ${ADMIN_NAV.map((n) => `
           <button class="nav-item ${state.adminSection === n.key ? "active" : ""}" data-action="admin:nav" data-section="${n.key}">
             ${n.icon}<span>${n.label}</span>
-            ${n.key === "dashboard" && pendingAssessments().length ? `<span class="nav-badge">${pendingAssessments().length}</span>` : ""}
+            ${n.key === "dashboard" && pendingAssessmentRowCount() ? `<span class="nav-badge">${LIVE_API ? (state.school && state.school.pendingAssessmentCount || pendingAssessmentRowCount()) : pendingAssessmentRowCount()}</span>` : ""}
           </button>`).join("")}
       </nav>
       <div class="nav-label">Account</div>
@@ -1117,7 +1117,7 @@ function adminDashboard() {
       <div class="card stat"><div class="stat-top"><div class="stat-icon blue">${ic.users}</div></div><div class="stat-value">${LIVE_API ? (s.students || 0) : (s.students || 348)}</div><div class="stat-label">Total Students</div><div class="stat-delta up">${ic.trend} <span>${LIVE_API ? "School register" : "+12 this term"}</span></div></div>
       <div class="card stat"><div class="stat-top"><div class="stat-icon purple">${ic.userCheck}</div></div><div class="stat-value">${LIVE_API ? (s.teacherCount || 0) : 24}</div><div class="stat-label">Total Teachers</div><div class="stat-delta up"><span>${LIVE_API ? "School register" : "2 on leave"}</span></div></div>
       <div class="card stat"><div class="stat-top"><div class="stat-icon green">${ic.wallet}</div></div><div class="stat-value">${money(collected)}</div><div class="stat-label">Fees Collected</div><div class="stat-delta up">${ic.trend} <span>${pct}% of expected</span></div></div>
-      <div class="card stat"><div class="stat-top"><div class="stat-icon amber">${ic.clock}</div></div><div class="stat-value">${LIVE_API ? (s.pendingAssessmentCount || 0) : pendingAssessments().length}</div><div class="stat-label">Pending Results Approval</div><div class="stat-delta down"><span>Awaiting your review</span></div></div>
+      <div class="card stat"><div class="stat-top"><div class="stat-icon amber">${ic.clock}</div></div><div class="stat-value">${LIVE_API ? (s.pendingAssessmentCount || 0) : pendingAssessmentRowCount()}</div><div class="stat-label">Pending Results Approval</div><div class="stat-delta down"><span>Awaiting your review</span></div></div>
     </div>
 
     <div class="two-col">
@@ -1151,8 +1151,8 @@ function adminDashboard() {
 
     <div class="card" style="margin-top:20px">
       <div class="card-head" style="padding:0 0 8px;border-bottom:0">
-        <div><h3>Assessments Pending Approval</h3><div class="hint">Submitted by teachers — grade them before they reach student report cards</div></div>
-        <span class="badge badge-amber">${pendingAssessments().length} pending</span>
+        <div><h3>Assessments Pending Approval</h3><div class="hint">Submitted by teachers — review results &amp; traits before they reach student report cards</div></div>
+        <span class="badge badge-amber">${pendingAssessments().length} submission${pendingAssessments().length === 1 ? "" : "s"} pending</span>
       </div>
       ${pendingAssessments().length ? pendingAssessments().map((a) => `
         <div class="list-row">
@@ -1160,12 +1160,13 @@ function adminDashboard() {
             <div class="stat-icon amber" style="width:38px;height:38px;border-radius:10px">${ic.book}</div>
             <div>
               <div class="cell-strong">${esc(a.cls)} · ${esc(a.subject)}</div>
-              <div class="cell-muted">${esc(a.teacher || "Teacher")} · ${esc(a.term)} · submitted ${fmtDate(a.submittedAt)}</div>
+              <div class="cell-muted">${esc(a.teacher || "Teacher")} · ${esc(a.term)}${a.session ? " · " + esc(a.session) : ""} · submitted ${fmtDate(a.submittedAt)}${a.rows && a.rows.length ? ` · ${a.rows.length} student${a.rows.length === 1 ? "" : "s"}` : ""}</div>
             </div>
           </div>
           <div class="row-actions">
-            <button class="btn btn-green btn-sm" data-action="assess:approve" data-id="${esc(a.id)}">${ic.check}<span>Approve</span></button>
-            <button class="btn btn-amber btn-sm" data-action="assess:revise" data-id="${esc(a.id)}">${ic.refresh}<span>Request Revision</span></button>
+            <button class="btn btn-soft btn-sm" data-action="assess:view" data-id="${esc(a.dbId || a.id)}">${ic.eye}<span>View</span></button>
+            <button class="btn btn-green btn-sm" data-action="assess:approve" data-id="${esc(a.dbId || a.id)}" data-class-id="${esc(a.classId || "")}" data-subject="${esc(a.subject || "")}" data-term="${esc(a.term || "")}" data-session="${esc(a.session || "")}">${ic.check}<span>Approve</span></button>
+            <button class="btn btn-amber btn-sm" data-action="assess:revise" data-id="${esc(a.dbId || a.id)}" data-class-id="${esc(a.classId || "")}" data-subject="${esc(a.subject || "")}" data-term="${esc(a.term || "")}" data-session="${esc(a.session || "")}">${ic.refresh}<span>Request Revision</span></button>
           </div>
         </div>`).join("") : `
         <div class="cell-muted" style="padding:22px;text-align:center">All caught up — no assessments awaiting review. 🎉</div>`}
@@ -1215,7 +1216,7 @@ function adminStudents() {
       ${kpi("Total Students", list.length, ic.users, "#6366f1")}
       ${kpi("Fees Cleared", list.length - owing.length, ic.check, "#16a34a")}
       ${kpi("Owing Fees", owing.length, ic.alert, "#dc2626")}
-      ${kpi("Awaiting Results", pendingAssessments().length, ic.clock, "#d97706")}
+      ${kpi("Awaiting Results", LIVE_API ? (state.school && state.school.pendingAssessmentCount || 0) : pendingAssessmentRowCount(), ic.clock, "#d97706")}
     </div>
 
     <div class="card" style="margin-bottom:18px">
@@ -2171,9 +2172,33 @@ function subjectsForClass(cls, schoolId) {
 }
 
 /* ----------------------- Assessments / approval workflow ----------------------- */
+function groupPendingAssessments(list) {
+  const groups = new Map();
+  (list || []).forEach((a) => {
+    const key = [String(a.schoolId || ""), String(a.classId || a.cls || ""), String(a.subject || "").toLowerCase(), String(a.term || ""), String(a.session || "")].join("|");
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        id: a.id, dbId: a.dbId || a.id,
+        schoolId: a.schoolId, classId: a.classId, cls: a.cls, subject: a.subject,
+        term: a.term, session: a.session,
+        teacher: a.teacher, teacherEmail: a.teacherEmail,
+        submittedAt: a.submittedAt, status: a.status, note: a.note, principal: a.principal,
+        rows: [],
+      });
+    }
+    groups.get(key).rows.push(a);
+  });
+  return Array.from(groups.values());
+}
 function pendingAssessments() {
   const sid = state.school ? state.school.id : null;
-  return state.assessments.filter((a) => a.schoolId === sid && a.status === "pending");
+  const rows = state.assessments.filter((a) => String(a.schoolId) === String(sid) && a.status === "pending");
+  return groupPendingAssessments(rows);
+}
+function pendingAssessmentRowCount() {
+  const sid = state.school ? state.school.id : null;
+  return state.assessments.filter((a) => String(a.schoolId) === String(sid) && a.status === "pending").length;
 }
 function currentAssessment(cls, subject) {
   const sid = state.school ? state.school.id : null;
@@ -2184,7 +2209,46 @@ function currentAssessment(cls, subject) {
     (a.status === "pending" || a.status === "revised" || a.status === "approved")
   ) || null;
 }
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+function traitListText(list) {
+  const items = Array.isArray(list) ? list.filter((x) => x && x.trait && x.rating) : [];
+  return items.length ? items.map((x) => `${x.trait}: ${x.rating}`).join(", ") : "—";
+}
+function assessmentDetailsModal(details) {
+  const g = details && details.group ? details.group : {};
+  const rows = (details && details.rows) ? details.rows : [];
+  const body = rows.map((r, i) => `
+    <tr>
+      <td class="cell-muted">${i + 1}</td>
+      <td><div class="cell-strong">${esc(r.studentName || r.studentId || "—")}</div><div class="cell-muted">${esc(r.studentId || "")}</div></td>
+      <td>${r.ca1 ?? "—"}</td><td>${r.ca2 ?? "—"}</td><td>${r.exam ?? "—"}</td>
+      <td class="cell-strong">${r.total ?? "—"}</td>
+      <td><span class="badge ${r.grade === "F" ? "badge-expired" : r.grade ? "badge-active" : "badge-muted"}">${esc(r.grade || "—")}</span></td>
+      <td style="font-size:12px;max-width:220px">${esc(traitListText(r.affective))}</td>
+      <td style="font-size:12px;max-width:220px">${esc(traitListText(r.psychomotor))}</td>
+    </tr>`).join("");
+  openModal(`
+    <div class="modal-head">
+      <div><h3>Review Submission — ${esc(g.className || "")} · ${esc(g.subject || "")}</h3>
+      <div class="sub">${esc(g.teacherEmail || "Teacher")} · ${esc(g.term || "")}${g.session ? " · " + esc(g.session) : ""} · submitted ${g.submittedAt ? fmtDate(String(g.submittedAt).slice(0,10)) : "—"}</div></div>
+      <button class="close-x" data-action="modal:close">${ic.x}</button>
+    </div>
+    <div class="modal-body" style="max-height:70vh;overflow:auto">
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>#</th><th>Student</th><th>CA1</th><th>CA2</th><th>Exam</th><th>Total</th><th>Grade</th><th>Affective Traits</th><th>Psychomotor Traits</th></tr></thead>
+          <tbody>${body || `<tr><td colspan="9" class="cell-muted" style="text-align:center;padding:18px">No rows found.</td></tr>`}</tbody>
+        </table>
+      </div>
+      <div class="hint" style="margin-top:10px">Review scores and traits, then close and choose <strong>Approve</strong> or <strong>Request Revision</strong>.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" data-action="modal:close">Close</button>
+      <button class="btn btn-amber" data-action="assess:revise" data-id="${esc(g.id || "")}" data-class-id="${esc(g.classId || "")}" data-subject="${esc(g.subject || "")}" data-term="${esc(g.term || "")}" data-session="${esc(g.session || "")}" data-from-view="1">${ic.refresh}<span>Request Revision</span></button>
+      <button class="btn btn-green" data-action="assess:approve" data-id="${esc(g.id || "")}" data-class-id="${esc(g.classId || "")}" data-subject="${esc(g.subject || "")}" data-term="${esc(g.term || "")}" data-session="${esc(g.session || "")}" data-from-view="1">${ic.check}<span>Approve</span></button>
+    </div>
+  `);
+}
+
 
 function rosterFor(cls) {
   const sid = state.school ? state.school.id : (state.auth && state.auth.admin ? state.auth.admin.schoolId : null);
@@ -3435,38 +3499,82 @@ document.addEventListener("click", async (e) => {
       break;
     }
 
+    case "assess:view": {
+      if (!LIVE_API) {
+        const a = state.assessments.find((x) => String(x.id) === String(rawId) || String(x.dbId) === String(rawId));
+        if (!a) break;
+        const groupRows = state.assessments.filter((x) => String(x.schoolId) === String(a.schoolId) && String(x.classId || "") === String(a.classId || "") && normClass(x.cls) === normClass(a.cls) && String(x.subject).toLowerCase() === String(a.subject).toLowerCase() && x.term === a.term && x.session === a.session);
+        assessmentDetailsModal({
+          group: { id: a.id, classId: a.classId, className: a.cls, subject: a.subject, teacherEmail: a.teacherEmail || a.teacher, term: a.term, session: a.session, submittedAt: a.submittedAt },
+          rows: groupRows.map((r) => ({ studentId: r.studentId, studentName: r.studentId, ca1: r.ca1, ca2: r.ca2, exam: r.exam, total: r.total, grade: r.grade, affective: [], psychomotor: [] })),
+        });
+        break;
+      }
+      try {
+        const details = await SyntaxApi.admin.getAssessmentDetails(rawId);
+        assessmentDetailsModal(details);
+      } catch (err) {
+        toast("Could not load assessment", err.message || "Failed to load results and traits for review.", "error");
+      }
+      break;
+    }
+
     case "assess:approve": {
-      const a = state.assessments.find((x) => x.id === rawId);
-      if (!a) break;
+      const fromView = btn.getAttribute("data-from-view") === "1";
+      const groupPayload = {
+        classId: btn.getAttribute("data-class-id") || "",
+        subject: btn.getAttribute("data-subject") || "",
+        term: btn.getAttribute("data-term") || "",
+        session: btn.getAttribute("data-session") || "",
+      };
+      const a = state.assessments.find((x) => String(x.id) === String(rawId) || String(x.dbId) === String(rawId));
+      if (!a && !groupPayload.classId) break;
       if (LIVE_API) {
         try {
-          await SyntaxApi.admin.reviewAssessment({ assessmentId: a.dbId || a.id, action: "approve" });
-          a.status = "approved"; a.approvedAt = todayISO(); a.note = "";
-          recordActivity("assessment.reviewed", "Assessment approved", `${a.cls} · ${a.subject} grades published to report cards.`);
-          toast("Assessment approved", `${a.cls} · ${a.subject} grades are now published to report cards.`, "success");
+          const payload = (groupPayload.classId && groupPayload.subject && groupPayload.term && groupPayload.session)
+            ? { ...groupPayload, action: "approve" }
+            : { assessmentId: a.dbId || a.id, action: "approve" };
+          await SyntaxApi.admin.reviewAssessment(payload);
+          if (a) {
+            const sid = state.school ? String(state.school.id) : "";
+            state.assessments.forEach((x) => {
+              const sameGroup = groupPayload.classId
+                ? (String(x.classId || "") === groupPayload.classId && String(x.subject).toLowerCase() === String(groupPayload.subject).toLowerCase() && x.term === groupPayload.term && x.session === groupPayload.session)
+                : (String(x.id) === String(a.id) || String(x.dbId) === String(a.dbId));
+              if (String(x.schoolId) === sid && sameGroup && x.status === "pending") { x.status = "approved"; x.approvedAt = todayISO(); x.note = ""; }
+            });
+          }
+          if (fromView) closeModal();
+          recordActivity("assessment.reviewed", "Assessment approved", `${(a && a.cls) || groupPayload.subject} grades published to report cards.`);
+          toast("Assessment approved", "Grades are now published to report cards.", "success");
+          if (typeof liveLoadAdminData === "function") await liveLoadAdminData().catch(() => {});
         } catch (err) {
           toast("Approval failed", err.message || "Could not approve this assessment.", "error");
         }
         render();
         break;
       }
-      a.status = "approved"; a.approvedAt = todayISO(); a.note = "";
-      recordActivity("assessment.reviewed", "Assessment approved", `${a.cls} · ${a.subject} grades published to report cards.`);
-      toast("Assessment approved", `${a.cls} · ${a.subject} grades are now published to report cards.`, "success");
+      if (a) { a.status = "approved"; a.approvedAt = todayISO(); a.note = ""; }
+      recordActivity("assessment.reviewed", "Assessment approved", `${a ? a.cls + " · " + a.subject : "Assessment"} grades published to report cards.`);
+      toast("Assessment approved", "Grades are now published to report cards.", "success");
       render();
       break;
     }
     case "assess:revise": {
-      const a = state.assessments.find((x) => x.id === rawId);
-      if (!a) break;
+      const a = state.assessments.find((x) => String(x.id) === String(rawId) || String(x.dbId) === String(rawId));
+      const classId = btn.getAttribute("data-class-id") || (a && a.classId) || "";
+      const subject = btn.getAttribute("data-subject") || (a && a.subject) || "";
+      const term = btn.getAttribute("data-term") || (a && a.term) || "";
+      const session = btn.getAttribute("data-session") || (a && a.session) || "";
+      const title = a ? `${a.cls} · ${a.subject}` : `${subject}`;
       openModal(`
         <div class="modal-head">
-          <div><h3>Request Revision</h3><div class="sub">Send feedback back to ${esc(a.teacher)}.</div></div>
+          <div><h3>Request Revision</h3><div class="sub">Send feedback back to ${esc((a && a.teacher) || "the teacher")}.</div></div>
           <button class="close-x" data-action="modal:close">${ic.x}</button>
         </div>
-        <form data-action="form:revision" data-id="${rawId}">
+        <form data-action="form:revision" data-id="${esc(rawId)}" data-class-id="${esc(classId)}" data-subject="${esc(subject)}" data-term="${esc(term)}" data-session="${esc(session)}">
           <div class="modal-body">
-            <div class="list-row"><span class="cell-muted">Assessment</span><strong>${esc(a.cls)} · ${esc(a.subject)}</strong></div>
+            <div class="list-row"><span class="cell-muted">Assessment</span><strong>${esc(title)}</strong></div>
             <div class="field" style="margin-top:14px">
               <label for="rev-note">Feedback for the teacher</label>
               <textarea class="input" id="rev-note" name="note" rows="4" placeholder="e.g. Recheck the CA1 totals for students 4-8, then re-submit." required></textarea>
@@ -4172,10 +4280,33 @@ document.addEventListener("submit", async (e) => {
   }
 
   if (action === "form:revision") {
-    const a = state.assessments.find((x) => x.id === form.getAttribute("data-id"));
+    const data = new FormData(form);
+    const note = String(data.get("note") || "").trim() || "Revision requested by the Principal.";
+    const assessmentId = form.getAttribute("data-id");
+    const group = {
+      classId: form.getAttribute("data-class-id") || "",
+      subject: form.getAttribute("data-subject") || "",
+      term: form.getAttribute("data-term") || "",
+      session: form.getAttribute("data-session") || "",
+    };
+    if (LIVE_API) {
+      try {
+        const payload = (group.classId && group.subject && group.term && group.session)
+          ? { ...group, action: "reject", note }
+          : { assessmentId, action: "reject", note };
+        await SyntaxApi.admin.reviewAssessment(payload);
+        closeModal();
+        toast("Revision requested", "Feedback was sent to the teacher.", "success");
+        if (typeof liveLoadAdminData === "function") await liveLoadAdminData().catch(() => {});
+        render();
+      } catch (err) {
+        toast("Revision request failed", err.message || "Could not send the revision request.", "error");
+      }
+      return;
+    }
+    const a = state.assessments.find((x) => String(x.id) === String(assessmentId) || String(x.dbId) === String(assessmentId));
     if (a) {
-      const note = String(new FormData(form).get("note") || "").trim();
-      a.status = "revised"; a.note = note || "Revision requested by the Principal."; a.revisedAt = todayISO();
+      a.status = "revised"; a.note = note; a.revisedAt = todayISO();
       recordActivity("assessment.reviewed", "Revision requested", `${a.cls} · ${a.subject} sent back to ${a.teacher}.`);
       toast("Revision requested", `Feedback sent to ${a.teacher} for ${a.cls} · ${a.subject}.`);
       render();
@@ -4430,12 +4561,13 @@ function liveUpsertStudent(u) {
 
 async function liveLoadAdminData() {
   const schoolId = String(state.school.id);
-  const [dashboard, studentPage, teacherPage, classRows, schoolData] = await Promise.all([
+  const [dashboard, studentPage, teacherPage, classRows, schoolData, pendingAssessPage] = await Promise.all([
     SyntaxApi.admin.dashboard(),
     SyntaxApi.admin.listStudents({ page: 1, limit: 100 }),
     SyntaxApi.admin.listTeachers({ page: 1, limit: 100 }),
     SyntaxApi.admin.listClasses(),
     SyntaxApi.admin.getSubscription(),
+    SyntaxApi.admin.listAssessments({ status: "Pending Approval", page: 1, limit: 100 }).catch(() => ({ items: [] })),
   ]);
 
   const students = [...(studentPage.items || [])];
@@ -4469,6 +4601,33 @@ async function liveLoadAdminData() {
       students: 0,
     };
   });
+
+  // Map assessment rows into UI shape (grouped later by pendingAssessments helper)
+  const assessItems = (pendingAssessPage && pendingAssessPage.items) ? pendingAssessPage.items : [];
+  state.assessments = state.assessments.filter((a) => String(a.schoolId) !== schoolId);
+  assessItems.forEach((a) => {
+    const teacherEmail = (a.teacherEmail || "").toLowerCase();
+    const t = teacherEmail ? state.teachers.find((x) => String(x.schoolId) === schoolId && String(x.email || "").toLowerCase() === teacherEmail) : null;
+    state.assessments.push({
+      id: a.id,
+      dbId: a.id,
+      schoolId,
+      classId: a.classId,
+      cls: a.className,
+      subject: a.subject,
+      term: a.term,
+      session: a.session,
+      teacherId: a.teacherId || null,
+      teacher: (t && t.name) || a.teacherEmail || "Teacher",
+      teacherEmail: a.teacherEmail,
+      status: a.status === "Approved" ? "approved" : a.status === "Revised" ? "revised" : "pending",
+      submittedAt: a.submittedAt ? String(a.submittedAt).slice(0, 10) : todayISO(),
+      note: a.note || "",
+      principal: a.principalName || "",
+      studentId: a.studentId,
+    });
+  });
+
   state.fees = dashboard.fees || { collected: 0, pending: 0, expected: 0 };
   state.school.students = dashboard.studentCount || 0;
   state.school.teacherCount = dashboard.teacherCount || 0;

@@ -59,10 +59,20 @@ router.get(
   validate(listAssessmentsQuerySchema, 'query'),
   adminController.listAssessments,
 );
+router.get(
+  '/pending-assessments/:id',
+  validate(idParamsSchema, 'params'),
+  adminController.getAssessmentDetails,
+);
 router.post(
   '/pending-assessments',
   validate(reviewAssessmentSchema),
   adminController.reviewAssessment,
+);
+router.post(
+  '/pending-assessments/review-group',
+  validate(reviewAssessmentSchema),
+  adminController.reviewAssessmentGroup,
 );
 
 // --- Subscription ---

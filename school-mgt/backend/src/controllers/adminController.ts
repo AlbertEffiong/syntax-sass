@@ -128,6 +128,17 @@ export const resendTeacherOtp = asyncHandler(async (req: Request, res: Response)
   return ok(res, result, 'A new verification code has been sent.');
 });
 
+export const getAssessmentDetails = asyncHandler(async (req: Request, res: Response) => {
+  const details = await adminService.getAssessmentDetails(requireTenant(req), req.params.id);
+  return ok(res, details);
+});
+
+export const reviewAssessmentGroup = asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as { classId: string; subject: string; term: string; session: string; action: 'approve' | 'reject'; note?: string };
+  const result = await adminService.reviewAssessmentGroup({ schoolId: requireTenant(req), ...body });
+  return ok(res, result, body.action === 'approve' ? 'Assessment approved.' : 'Assessment returned for revision.');
+});
+
 /**
  * GET /api/admin/pending-assessments
  */
@@ -142,7 +153,20 @@ export const listAssessments = asyncHandler(async (req: Request, res: Response) 
  * Approve or reject a teacher submission.
  */
 export const reviewAssessment = asyncHandler(async (req: Request, res: Response) => {
-  const body = req.body as ReviewAssessmentBody;
+  const body = req.body as ReviewAssessmentBody & { classId?: string; subject?: string; term?: string; session?: string };
+  if (body.classId && body.subject && body.term && body.session) {
+    const result = await adminService.reviewAssessmentGroup({
+      schoolId: requireTenant(req),
+      classId: body.classId,
+      subject: body.subject,
+      term: body.term,
+      session: body.session,
+      action: body.action,
+      note: body.note,
+    });
+    return ok(res, result, `Assessment ${body.action === 'approve' ? 'approved' : 'returned for revision'}.`);
+  }
+  if (!body.assessmentId) throw ApiError.badRequest('assessmentId or group identifiers are required.', 'VALIDATION_ERROR');
   const assessment = await adminService.reviewAssessment({
     schoolId: requireTenant(req),
     assessmentId: body.assessmentId,

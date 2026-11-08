@@ -5,6 +5,7 @@ import { Student } from '../models/Student';
 import { Teacher } from '../models/Teacher';
 import { Assessment, AssessmentStatus } from '../models/Assessment';
 import { SchoolActivity } from '../models/SchoolActivity';
+import { StudentTrait } from '../models/StudentTrait';
 import { ApiError } from '../utils/ApiError';
 import { sendStudentCredentials } from '../utils/mailer';
 import { assertSameSchool } from '../utils/security';
@@ -66,6 +67,16 @@ export interface UpdateStudentInput {
 export interface ReviewAssessmentInput {
   schoolId: string;
   assessmentId: string;
+  action: 'approve' | 'reject';
+  note?: string;
+}
+
+export interface ReviewAssessmentGroupInput {
+  schoolId: string;
+  classId: string;
+  subject: string;
+  term: string;
+  session: string;
   action: 'approve' | 'reject';
   note?: string;
 }
@@ -469,6 +480,103 @@ export async function reviewAssessment(input: ReviewAssessmentInput): Promise<As
     `${assessment.className} · ${assessment.subject} was ${input.action === 'approve' ? 'approved' : 'returned for revision'}.`,
   );
   return serializeAssessment(assessment);
+}
+
+/**
+ * Approves or rejects all assessment rows in a submitted broadsheet group
+ * (class + subject + term + session) for the tenant. Tenant-scoped.
+ */
+export async function reviewAssessmentGroup(input: ReviewAssessmentGroupInput): Promise<{ updated: number }> {
+  const cls = await ClassModel.findOne({ _id: input.classId, schoolId: input.schoolId });
+  if (!cls) throw ApiError.notFound('Class not found.', 'CLASS_NOT_FOUND');
+
+  const canonicalSubject = cls.subjects.find((s) => s.toLowerCase() === input.subject.toLowerCase()) || input.subject;
+  const filter = {
+    schoolId: input.schoolId,
+    classId: cls._id,
+    subject: canonicalSubject,
+    term: input.term,
+    session: input.session,
+  };
+  const update = input.action === 'approve'
+    ? { $set: { status: 'Approved' as AssessmentStatus, approvedAt: new Date(), note: input.note ?? '' } }
+    : { $set: { status: 'Revised' as AssessmentStatus, note: input.note ?? 'Returned for revision.' }, $unset: { approvedAt: 1 } };
+
+  const result = await Assessment.updateMany(filter, update);
+  const updated = result.modifiedCount ?? 0;
+  if (updated === 0) {
+    throw ApiError.badRequest('No assessment rows found for this submission.', 'ASSESSMENT_NOT_FOUND');
+  }
+  await cache.invalidatePrefix(`assessments:${input.schoolId}:`);
+  await recordSchoolActivity(
+    input.schoolId,
+    'assessment.reviewed',
+    input.action === 'approve' ? 'Results approved' : 'Results returned for revision',
+    `${cls.className} · ${canonicalSubject} (${updated} rows) was ${input.action === 'approve' ? 'approved' : 'returned for revision'}.`,
+  );
+  return { updated };
+}
+
+/**
+ * Returns full detail for an assessment submission group (all student rows +
+ * saved traits for the term/session) so admin can review before deciding.
+ */
+export async function getAssessmentDetails(schoolId: string, assessmentId: string) {
+  const assessment = await Assessment.findById(assessmentId);
+  if (!assessment) throw ApiError.notFound('Assessment not found.', 'ASSESSMENT_NOT_FOUND');
+  assertSameSchool(assessment.schoolId, schoolId);
+
+  const filter = {
+    schoolId,
+    classId: assessment.classId,
+    subject: assessment.subject,
+    term: assessment.term,
+    session: assessment.session,
+  };
+  const rows = await Assessment.find(filter).sort({ studentId: 1 });
+  const studentIds = Array.from(new Set(rows.map((r) => String(r.studentId).toUpperCase())));
+  const students = studentIds.length
+    ? await Student.find({ schoolId, studentId: { $in: studentIds } }).select('_id studentId fullName')
+    : [];
+  const studentById = new Map(students.map((s) => [String(s.studentId).toUpperCase(), s]));
+  const refIds = students.map((s) => s._id);
+  const traits = refIds.length
+    ? await StudentTrait.find({ schoolId, studentRef: { $in: refIds }, term: assessment.term, session: assessment.session }).lean()
+    : [];
+  const traitByRef = new Map(traits.map((t: any) => [String(t.studentRef), t]));
+
+  return {
+    group: {
+      id: String(assessment._id),
+      classId: String(assessment.classId),
+      className: assessment.className,
+      subject: assessment.subject,
+      teacherEmail: assessment.teacherEmail,
+      term: assessment.term,
+      session: assessment.session,
+      status: assessment.status,
+      submittedAt: assessment.submittedAt,
+      principalName: assessment.principalName,
+      note: assessment.note,
+    },
+    rows: rows.map((r) => {
+      const st = studentById.get(String(r.studentId).toUpperCase());
+      const tr = st ? traitByRef.get(String(st._id)) : null;
+      return {
+        assessmentId: String(r._id),
+        studentId: r.studentId,
+        studentName: st ? st.fullName : r.studentId,
+        ca1: r.ca1,
+        ca2: r.ca2,
+        exam: r.exam,
+        total: r.total,
+        grade: r.grade,
+        status: r.status,
+        affective: tr?.affective || [],
+        psychomotor: tr?.psychomotor || [],
+      };
+    }),
+  };
 }
 
 /**

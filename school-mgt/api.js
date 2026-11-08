@@ -294,6 +294,9 @@
     listAssessments: function (params) {
       return get('/api/admin/pending-assessments' + buildQuery(params));
     },
+    getAssessmentDetails: function (id) {
+      return get('/api/admin/pending-assessments/' + encodeURIComponent(id));
+    },
     reviewAssessment: function (payload) {
       return post('/api/admin/pending-assessments', payload);
     },
