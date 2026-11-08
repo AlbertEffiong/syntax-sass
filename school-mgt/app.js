@@ -2209,6 +2209,7 @@ function ensureScores(cls, subj) {
 function teacherApp() {
 const schoolName = (state.school && state.school.name) || "School";
 const me = teacherById(state.auth.teacher && state.auth.teacher.teacherId);
+const tab = state.teacherTab || "manual";
 const classOptions = schoolClassOptions();
 
   if (!classOptions.length) {
