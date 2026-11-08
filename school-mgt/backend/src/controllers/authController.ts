@@ -96,3 +96,9 @@ function requireTenant(req: Request): string {
   }
   return req.tenantSchoolId;
 }
+
+export const resendOtp = asyncHandler(async (req: Request, res: Response) => {
+  const { email } = req.body;
+  await authService.resendTeacherOtpByEmail(email);
+  res.json({ success: true, data: { message: 'OTP resent' } });
+});

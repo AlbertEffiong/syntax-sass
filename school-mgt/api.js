@@ -201,6 +201,9 @@
     verifyOtp: function (payload) {
       return post('/api/auth/verify-otp', payload).then(captureToken);
     },
+    resendOtp: function (payload) {
+      return post('/api/auth/resend-otp', payload);
+    },
     me: function () {
       return get('/api/auth/me').then(captureToken);
     },

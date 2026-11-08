@@ -1817,6 +1817,7 @@ function teacherLoginOtpModal(email) {
         </div>
       </div>
       <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" data-action="teacher:resendOtp" data-email="${esc(email)}">Resend OTP</button>
         <button type="button" class="btn btn-ghost" data-action="modal:close">Cancel</button>
         <button type="submit" class="btn btn-primary">${ic.shield}<span>Verify and Continue</span></button>
       </div>
@@ -2944,6 +2945,15 @@ document.addEventListener("click", async (e) => {
     case "teacher:invite":
       inviteTeacherModal();
       break;
+    case "teacher:resendOtp": {
+      const em = btn.getAttribute("data-email");
+      if (LIVE_API) {
+        try { await window.SyntaxApi.auth.resendOtp({ email: em }); toast("OTP sent", "A new code was emailed.", "success"); }
+        catch (e) { toast("Error", e.message || "Could not resend OTP.", "error"); }
+      }
+      break;
+    }
+
     case "teacher:verify": {
       const t = teacherById(rawId);
       if (t) otpModal(t);

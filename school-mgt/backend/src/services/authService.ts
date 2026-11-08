@@ -356,3 +356,16 @@ function invalidCredentials(): ApiError {
 
 // Re-exported for controllers that need the school document type.
 export type { ISchoolDocument, IOwnerDocument, ITeacherDocument, IStudentDocument };
+
+
+export async function resendTeacherOtpByEmail(email: string): Promise<void> {
+  const teacher = await Teacher.findOne({ email: email.toLowerCase().trim() });
+  if (!teacher) throw ApiError.notFound('Teacher not found.', 'TEACHER_NOT_FOUND');
+  if (teacher.verified) throw ApiError.conflict('Already verified.', 'ALREADY_VERIFIED');
+  const { code, hash, expiresAt } = await generateOtp();
+  teacher.otpHash = hash;
+  teacher.otpExpiresAt = expiresAt;
+  await teacher.save();
+  const school = await School.findById(teacher.schoolId);
+  await sendTeacherOtpEmail(teacher.email, code, school?.name ?? 'your school');
+}

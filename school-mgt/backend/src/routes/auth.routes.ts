@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import * as authController from '../controllers/authController';
 import { authenticate, authorize } from '../middleware/auth';
 import { enforceTenant } from '../middleware/tenant';
@@ -68,5 +69,7 @@ router.get('/me', authenticate, authController.me);
  * @access Authenticated
  */
 router.post('/logout', authenticate, authController.logout);
+
+router.post('/resend-otp', authRateLimiter, validate(z.object({ email: z.string().email() })), authController.resendOtp);
 
 export default router;
