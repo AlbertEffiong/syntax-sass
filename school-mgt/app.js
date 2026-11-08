@@ -2945,14 +2945,6 @@ document.addEventListener("click", async (e) => {
     case "teacher:invite":
       inviteTeacherModal();
       break;
-    case "teacher:resendOtp": {
-      const em = btn.getAttribute("data-email");
-      if (LIVE_API) {
-        try { await window.SyntaxApi.auth.resendOtp({ email: em }); toast("OTP sent", "A new code was emailed.", "success"); }
-        catch (e) { toast("Error", e.message || "Could not resend OTP.", "error"); }
-      }
-      break;
-    }
 
     case "teacher:verify": {
       const t = teacherById(rawId);
@@ -2960,14 +2952,26 @@ document.addEventListener("click", async (e) => {
       break;
     }
     case "teacher:resendOtp": {
+      const em = btn.getAttribute("data-email");
+      if (em) {
+        if (LIVE_API) {
+          try {
+            await window.SyntaxApi.auth.resendOtp({ email: em });
+            toast("OTP sent", "A new code was emailed.", "success");
+          } catch (e) {
+            toast("Error", e.message || "Could not resend OTP.", "error");
+          }
+        }
+        break;
+      }
       const t = teacherById(rawId);
       if (t) {
         if (LIVE_API) {
           SyntaxApi.admin.resendTeacherOtp(t.id).then((result) => {
             liveUpsertTeacher(result.teacher);
             const refreshed = teacherById(t.id);
-            refreshed.otp = result.otp;
-            otpModal(refreshed);
+            if (refreshed) refreshed.otp = result.otp;
+            if (refreshed) otpModal(refreshed);
             toast("OTP resent", `A new verification code was sent to ${t.email}.`, "success");
           }).catch((err) => toast("OTP resend failed", err.message || "Could not resend the verification code.", "error"));
         } else {
