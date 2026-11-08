@@ -4468,6 +4468,19 @@ async function liveLoadTeacherData() {
   ]);
   const school = liveUpsertSchool(schoolData);
   state.school = school;
+  const teacherId = state.auth.teacher && state.auth.teacher.teacherId;
+  if (teacherId && schoolData && (schoolData.teacherName || schoolData.teacherEmail)) {
+    liveUpsertTeacher({
+      id: teacherId,
+      schoolId: school.id,
+      name: schoolData.teacherName || schoolData.teacherEmail,
+      email: schoolData.teacherEmail || "",
+      subject: "",
+      classesTaught: 0,
+      status: "Active",
+      verified: true,
+    });
+  }
   state.classes = classRows.map((item) => ({
     id: item.id,
     schoolId: school.id,

@@ -48,10 +48,18 @@ export async function getClassesSubjects(schoolId: string): Promise<ClassPublic[
   return classes.map(serializeClass);
 }
 
-export async function getTeacherContext(schoolId: string) {
-  const school = await School.findById(schoolId);
+export async function getTeacherContext(schoolId: string, teacherId?: string) {
+  const [school, teacher] = await Promise.all([
+    School.findById(schoolId),
+    teacherId ? Teacher.findById(teacherId) : Promise.resolve(null),
+  ]);
   if (!school) throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');
-  return serializeSchool(school);
+  const data = serializeSchool(school) as any;
+  if (teacher) {
+    data.teacherName = teacher.name;
+    data.teacherEmail = teacher.email;
+  }
+  return data;
 }
 
 export async function getClassRoster(schoolId: string, classId: string) {

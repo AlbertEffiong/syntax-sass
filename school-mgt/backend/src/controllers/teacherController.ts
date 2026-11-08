@@ -15,7 +15,7 @@ export const getClassesSubjects = asyncHandler(async (req: Request, res: Respons
 });
 
 export const getContext = asyncHandler(async (req: Request, res: Response) => {
-  return ok(res, await teacherService.getTeacherContext(requireTenant(req)));
+  return ok(res, await teacherService.getTeacherContext(requireTenant(req), requireTeacherId(req)));
 });
 
 export const getClassRoster = asyncHandler(async (req: Request, res: Response) => {
