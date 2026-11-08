@@ -237,6 +237,9 @@
     removeSchool: function (id) {
       return del('/api/owner/schools/' + encodeURIComponent(id));
     },
+    getPendingPaymentReceipt: function (schoolId) {
+      return get('/api/owner/schools/' + encodeURIComponent(schoolId) + '/pending-payment/receipt');
+    },
     verifyPayment: function (payload) {
       return post('/api/owner/verify-payment', payload);
     },
@@ -305,6 +308,9 @@
     },
     submitBankTransfer: function (payload) {
       return post('/api/admin/subscription/bank-transfer', payload);
+    },
+    getPendingPaymentReceipt: function () {
+      return get('/api/admin/subscription/receipt');
     },
     getSubscription: function () {
       return get('/api/admin/subscription');

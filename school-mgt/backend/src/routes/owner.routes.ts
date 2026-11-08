@@ -75,5 +75,6 @@ router.delete(
  */
 router.post('/verify-payment', validate(verifyPaymentSchema), ownerController.verifyPayment);
 router.post('/reject-payment', validate(rejectPaymentSchema), ownerController.rejectPayment);
+router.get('/schools/:id/pending-payment/receipt', validate(setSchoolStatusParamsSchema, 'params'), ownerController.getPendingPaymentReceipt);
 
 export default router;

@@ -59,6 +59,11 @@ export const verifyPayment = asyncHandler(async (req: Request, res: Response) =>
   return ok(res, school, 'Payment verified and subscription renewed for 30 days.');
 });
 
+export const getPendingPaymentReceipt = asyncHandler(async (req: Request, res: Response) => {
+  const receipt = await ownerService.getPendingPaymentReceipt(req.params.id);
+  return ok(res, receipt);
+});
+
 export const rejectPayment = asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as { schoolId: string; reference?: string };
   const school = await ownerService.rejectPayment(body);

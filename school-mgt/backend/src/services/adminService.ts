@@ -625,6 +625,20 @@ export interface AcademicSettingInput {
 /**
  * Reads the tenant's school profile/settings.
  */
+export async function getPendingPaymentReceipt(schoolId: string) {
+  const school = await School.findById(schoolId);
+  if (!school) throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');
+  const receipt = school.pendingPayment?.receipt;
+  if (!receipt || !receipt.contentBase64) {
+    throw ApiError.notFound('No receipt file found for this payment.', 'RECEIPT_NOT_FOUND');
+  }
+  return {
+    fileName: receipt.fileName,
+    contentType: receipt.contentType,
+    contentBase64: receipt.contentBase64,
+  };
+}
+
 export async function updateSchoolSettings(
   schoolId: string,
   patch: { principalName?: string; currentPassword?: string; newPassword?: string },

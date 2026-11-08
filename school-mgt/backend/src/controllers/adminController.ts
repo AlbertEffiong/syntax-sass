@@ -199,6 +199,11 @@ export const getSchoolSettings = asyncHandler(async (req: Request, res: Response
   return ok(res, school);
 });
 
+export const getPendingPaymentReceipt = asyncHandler(async (req: Request, res: Response) => {
+  const receipt = await adminService.getPendingPaymentReceipt(requireTenant(req));
+  return ok(res, receipt);
+});
+
 export const updateSchoolSettings = asyncHandler(async (req: Request, res: Response) => {
   const school = await adminService.updateSchoolSettings(requireTenant(req), req.body);
   return ok(res, school, 'School profile updated.');

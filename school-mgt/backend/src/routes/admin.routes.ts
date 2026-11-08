@@ -82,5 +82,6 @@ router.post(
   adminController.submitBankTransfer,
 );
 router.get('/subscription', adminController.getSubscription);
+router.get('/subscription/receipt', adminController.getPendingPaymentReceipt);
 
 export default router;

@@ -705,6 +705,7 @@ function superAdmin() {
         </div>
       </div>
       <div class="row-actions">
+        ${s.pendingPayment && s.pendingPayment.receipt ? `<button class="btn btn-ghost btn-sm" data-action="payment:receipt" data-school-id="${s.id}" data-role="owner">${ic.eye}<span>View Receipt</span></button>` : ""}
         <button class="btn btn-green btn-sm" data-action="super:confirmPayment" data-id="${s.id}">${ic.check}<span>Confirm Receipt</span></button>
         <button class="btn btn-danger btn-sm" data-action="super:rejectPayment" data-id="${s.id}">${ic.x}<span>Reject</span></button>
       </div>
@@ -2002,7 +2003,7 @@ function adminSubscription() {
         <div class="pending-banner-title">Payment Pending Verification</div>
         <div class="pending-banner-text">We received your bank transfer submission${pend.reference ? " — Ref: " + esc(pend.reference) : ""} on ${fmtDate(pend.submittedAt)}. The platform owner will review your receipt and confirm your renewal shortly.</div>
       </div>
-      ${pend.receipt ? `<button class="btn btn-ghost btn-sm" data-action="payment:receipt">${ic.eye}<span>View Receipt</span></button>` : ""}
+      ${pend.receipt || pend.hasPendingPayment ? `<button class="btn btn-ghost btn-sm" data-action="payment:receipt" data-school-id="${esc(s.id || "")}" data-role="admin">${ic.eye}<span>View Receipt</span></button>` : ""}
     </div>` : ""}
     <div class="two-col">
       <div class="card">
@@ -3258,7 +3259,20 @@ document.addEventListener("click", async (e) => {
     }
 
     case "payment:receipt": {
-      const rec = state.school.pendingPayment;
+      const role = btn.getAttribute("data-role") || "";
+      const schoolId = btn.getAttribute("data-school-id") || (state.school && state.school.id) || "";
+      if (LIVE_API) {
+        try {
+          const receipt = role === "owner"
+            ? await window.SyntaxApi.owner.getPendingPaymentReceipt(schoolId)
+            : await SyntaxApi.admin.getPendingPaymentReceipt();
+          openReceipt(receipt);
+        } catch (err) {
+          toast("Receipt unavailable", err.message || "Could not load the receipt file.", "error");
+        }
+        break;
+      }
+      const rec = state.school && state.school.pendingPayment;
       if (rec && rec.receipt) openReceipt(rec.receipt);
       else toast("Receipt unavailable", "No receipt file was attached to this payment.", "error");
       break;
