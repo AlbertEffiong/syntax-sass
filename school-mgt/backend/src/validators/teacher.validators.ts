@@ -35,7 +35,7 @@ const traitRatingSchema = z.object({
 });
 
 export const studentIdParamsSchema = z.object({
-  studentId: objectIdSchema,
+  studentId: z.string().trim().min(1, 'Student id is required.'),
 });
 
 export const studentTraitsQuerySchema = z.object({

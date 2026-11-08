@@ -70,6 +70,7 @@ export async function getClassRoster(schoolId: string, classId: string) {
   }
   const students = await Student.find({ schoolId, currentClass: cls.className }).sort({ fullName: 1 });
   return students.map((student) => ({
+    id: String(student._id),
     studentId: student.studentId,
     fullName: student.fullName,
     currentClass: student.currentClass,

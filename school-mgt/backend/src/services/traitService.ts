@@ -13,6 +13,22 @@ export interface UpsertStudentTraitsInput {
   psychomotor: ITraitRating[];
 }
 
+async function resolveStudent(schoolId: string, studentRef: string) {
+  const ref = String(studentRef || '').trim();
+  let student = null;
+  if (Types.ObjectId.isValid(ref)) {
+    student = await Student.findOne({ _id: ref, schoolId });
+  }
+  if (!student) {
+    student = await Student.findOne({ studentId: ref, schoolId });
+  }
+  if (!student) {
+    throw ApiError.notFound('Student not found.', 'STUDENT_NOT_FOUND');
+  }
+  assertSameSchool(student.schoolId, schoolId);
+  return student;
+}
+
 /**
  * Returns the affective / psychomotor trait ratings for a student in a given
  * term/session. Returns empty arrays when no record exists yet.
@@ -23,15 +39,12 @@ export async function getStudentTraits(
   term: string,
   session: string,
 ): Promise<{ affective: ITraitRating[]; psychomotor: ITraitRating[] }> {
-  const student = await Student.findById(studentRef);
-  if (!student) {
-    throw ApiError.notFound('Student not found.', 'STUDENT_NOT_FOUND');
-  }
-  assertSameSchool(student.schoolId, schoolId);
+  const student = await resolveStudent(schoolId, studentRef);
+  const refId = String(student._id);
 
   const record = await StudentTrait.findOne({
     schoolId,
-    studentRef,
+    studentRef: refId,
     term,
     session,
   }).lean();
@@ -47,11 +60,8 @@ export async function getStudentTraits(
  * term/session. Tenant-scoped (IDOR safe).
  */
 export async function upsertStudentTraits(input: UpsertStudentTraitsInput): Promise<void> {
-  const student = await Student.findById(input.studentRef);
-  if (!student) {
-    throw ApiError.notFound('Student not found.', 'STUDENT_NOT_FOUND');
-  }
-  assertSameSchool(student.schoolId, input.schoolId);
+  const student = await resolveStudent(input.schoolId, input.studentRef);
+  const refId = String(student._id);
 
   const affective = Array.from(
     new Set((input.affective ?? []).map((r) => ({ trait: String(r.trait).trim(), rating: String(r.rating).trim() })).filter((r) => r.trait && r.rating)),
@@ -63,7 +73,7 @@ export async function upsertStudentTraits(input: UpsertStudentTraitsInput): Prom
   await StudentTrait.findOneAndUpdate(
     {
       schoolId: input.schoolId,
-      studentRef: input.studentRef,
+      studentRef: refId,
       term: input.term,
       session: input.session,
     },
@@ -75,7 +85,7 @@ export async function upsertStudentTraits(input: UpsertStudentTraitsInput): Prom
       },
       $setOnInsert: {
         schoolId: new Types.ObjectId(input.schoolId),
-        studentRef: new Types.ObjectId(input.studentRef),
+        studentRef: new Types.ObjectId(refId),
       },
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },

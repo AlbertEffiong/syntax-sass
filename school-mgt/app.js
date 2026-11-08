@@ -1855,8 +1855,8 @@ function studentTraitsModal(studentId, studentName, traits) {
   };
   const affectiveRows = stdAffective.map((t) => `<div class="trait-row"><span class="cell-muted">${esc(t)}</span><div style="text-align:right">${traitSelect("affective", t)}</div></div>`).join("");
   const psychomotorRows = stdPsychomotor.map((t) => `<div class="trait-row"><span class="cell-muted">${esc(t)}</span><div style="text-align:right">${traitSelect("psychomotor", t)}</div></div>`).join("");
-  const term = state.teacherTerm || "First Term";
-  const session = state.teacherSession || "";
+  const session = state.teacherSession || state.school?.academic?.currentSession || "2026/2027";
+  const term = state.teacherTerm || state.school?.academic?.currentTerm || "First Term";
   openModal(`
     <div class="modal-head">
       <div><h3>Student Traits</h3><div class="sub">${esc(studentName)} · ${esc(studentId)}</div></div>
@@ -3377,18 +3377,22 @@ document.addEventListener("click", async (e) => {
       const studentId = btn.getAttribute("data-student-id");
       const studentName = btn.getAttribute("data-student-name") || "";
       (async () => {
+        if (LIVE_API && !studentId) {
+          toast("Student not ready", "Reload the broadsheet, then try saving traits again.", "error");
+          return;
+        }
         let traits = { affective: [], psychomotor: [] };
         if (LIVE_API) {
           try {
             traits = await SyntaxApi.teacher.traits.get(studentId, {
               term: state.teacherTerm || "First Term",
-              session: state.teacherSession || "",
+              session: state.teacherSession || state.school.academic?.currentSession || "",
             });
           } catch (e) {
             /* start with blank traits */
           }
         } else {
-          const st = state.students.find((s) => s.id === studentId);
+          const st = state.students.find((s) => s.id === studentId || s.dbId === studentId);
           if (st) traits = { affective: st.affective || [], psychomotor: st.psychomotor || [] };
         }
         studentTraitsModal(studentId, studentName, traits);
@@ -4071,6 +4075,8 @@ document.addEventListener("submit", async (e) => {
     if (LIVE_API) {
       (async () => {
         try {
+          if (!studentId) throw new Error("Student id is missing. Reload the broadsheet and try again.");
+          if (!session) throw new Error("Academic session is missing. Ask the admin to set the current session, or reload.");
           await SyntaxApi.teacher.traits.upsert(studentId, { ...payload, term, session });
           closeModal();
           toast("Traits saved", `${studentId} traits saved for ${esc(term)} ${esc(session)}.`);
@@ -4525,11 +4531,11 @@ async function liveLoadTeacherBroadsheet(className, subject) {
   const scoreById = new Map(assessments.map((assessment) => [String(assessment.studentId).toUpperCase(), assessment]));
   const rows = roster.map((student) => {
     const saved = scoreById.get(String(student.studentId).toUpperCase());
-    liveUpsertStudent({ ...student, schoolId: state.school.id });
-    const stRec = state.students.find((s) => s.studentId === student.studentId);
+    liveUpsertStudent({ ...student, id: student.id, schoolId: state.school.id });
+    const stRec = state.students.find((s) => String(s.id) === String(student.studentId));
     return {
       studentId: student.studentId,
-      dbId: stRec ? stRec.dbId : null,
+      dbId: student.id || (stRec ? stRec.dbId : null),
       name: student.fullName,
       ca1: saved ? saved.ca1 : "",
       ca2: saved ? saved.ca2 : "",
