@@ -39,6 +39,7 @@ router.patch('/academic-setting', validate(academicSettingSchema), adminControll
 // --- Students ---
 router.post('/students', validate(enrollStudentSchema), adminController.enrollStudent);
 router.get('/students', validate(listStudentsQuerySchema, 'query'), adminController.listStudents);
+router.get('/students/:id', validate(idParamsSchema, 'params'), adminController.getStudent);
 router.patch('/students/:id', validate(idParamsSchema, 'params'), validate(updateStudentSchema), adminController.updateStudent);
 router.post('/students/:id/payments', validate(idParamsSchema, 'params'), validate(recordFeePaymentSchema), adminController.recordFeePayment);
 

@@ -110,13 +110,26 @@ export function serializeClass(cls: IClassDocument): ClassPublic {
   };
 }
 
+export interface HistoricalResultPublic {
+  session: string;
+  term: string;
+  class: string;
+  subjects: Array<{ subject: string; score: number; grade: string; remark?: string }>;
+  total: number;
+  average: number;
+  position?: number;
+  classSize?: number;
+  attendance?: string;
+  principalName?: string;
+}
+
 export interface StudentPublic {
   id: string;
   schoolId: string;
   studentId: string;
   fullName: string;
   gender: string;
-  dob: Date;
+  dob?: Date;
   currentClass: string;
   guardian: string;
   contact: string;
@@ -125,25 +138,35 @@ export interface StudentPublic {
   feeExpected: number;
   feeCollected: number;
   feeDue: number;
+  historicalResults?: HistoricalResultPublic[];
 }
 
-export function serializeStudent(student: IStudentDocument): StudentPublic {
-  return {
+export function serializeStudent(student: IStudentDocument, includeHistory = false): StudentPublic {
+  const base: StudentPublic = {
     id: String(student._id),
     schoolId: String(student.schoolId),
     studentId: student.studentId,
     fullName: student.fullName,
     gender: student.gender,
     dob: student.dob,
-  currentClass: student.currentClass,
-  guardian: student.guardian,
-  contact: student.contact,
-  email: student.email,
-  address: student.address,
+    currentClass: student.currentClass,
+    guardian: student.guardian,
+    contact: student.contact,
+    email: student.email,
+    address: student.address,
     feeExpected: student.feeExpected,
     feeCollected: student.feeCollected,
     feeDue: student.feeDue,
   };
+  if (includeHistory) {
+    base.historicalResults = (student.historicalResults || []).map((h: any) => ({
+      session: h.session, term: h.term, class: h.class,
+      subjects: (h.subjects || []).map((s: any) => ({ subject: s.subject, score: Number(s.score) || 0, grade: s.grade || '', remark: s.remark || '' })),
+      total: Number(h.total) || 0, average: Number(h.average) || 0,
+      position: h.position, classSize: h.classSize, attendance: h.attendance || '', principalName: h.principalName || '',
+    }));
+  }
+  return base;
 }
 
 export interface OwnerPublic {

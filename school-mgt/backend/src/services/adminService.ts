@@ -348,6 +348,13 @@ export async function updateDebtorControl(schoolId: string, restrictDebtors: boo
 /**
  * Lists students for the tenant (paginated), optionally filtered by class.
  */
+export async function getStudent(schoolId: string, studentId: string): Promise<StudentPublic> {
+  const student = await Student.findById(studentId);
+  if (!student) throw ApiError.notFound('Student not found.', 'STUDENT_NOT_FOUND');
+  assertSameSchool(student.schoolId, schoolId);
+  return serializeStudent(student, true);
+}
+
 export async function listStudents(
   schoolId: string,
   currentClass: string | undefined,
@@ -356,14 +363,14 @@ export async function listStudents(
   const filter: Record<string, unknown> = { schoolId };
   if (currentClass) filter.currentClass = currentClass;
 
-  const key = `students:${schoolId}:${currentClass ?? ''}:${pagination.page}:${pagination.limit}`;
+  const key = `students:${schoolId}:${currentClass ?? 'all'}:${pagination.page}:${pagination.limit}`;
   const cached = await cache.get<Paginated<StudentPublic>>(key);
   if (cached) return cached;
   const [rows, total] = await Promise.all([
-    Student.find(filter).sort({ fullName: 1 }).skip(pagination.skip).limit(pagination.limit),
+    Student.find(filter).sort({ createdAt: -1 }).skip(pagination.skip).limit(pagination.limit),
     Student.countDocuments(filter),
   ]);
-  const result = paginate(rows.map(serializeStudent), total, pagination.page, pagination.limit);
+  const result = paginate(rows.map((s) => serializeStudent(s, false)), total, pagination.page, pagination.limit);
   await cache.set(key, result);
   return result;
 }

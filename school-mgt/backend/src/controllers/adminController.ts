@@ -75,6 +75,11 @@ export const listStudents = asyncHandler(async (req: Request, res: Response) => 
   return ok(res, students);
 });
 
+export const getStudent = asyncHandler(async (req: Request, res: Response) => {
+  const student = await adminService.getStudent(requireTenant(req), req.params.id);
+  return ok(res, student);
+});
+
 export const updateStudent = asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as UpdateStudentBody;
   const student = await adminService.updateStudent(requireTenant(req), req.params.id, body);

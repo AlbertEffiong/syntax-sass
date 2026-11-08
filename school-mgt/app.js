@@ -3075,7 +3075,24 @@ document.addEventListener("click", async (e) => {
       break;
     case "student:view": {
       const st = state.students.find((s) => s.id === rawId);
-      if (st) studentProfileModal(st);
+      if (!st) break;
+      if (LIVE_API && st.dbId) {
+        try {
+          const detail = await SyntaxApi.admin.getStudent(st.dbId);
+          if (detail && Array.isArray(detail.historicalResults) && detail.historicalResults.length) {
+            st.history = mapHistoricalResults(detail.historicalResults);
+          }
+          if (detail) {
+            st.email = detail.email || st.email;
+            st.address = detail.address || st.address;
+            st.guardian = detail.guardian || st.guardian;
+            st.contact = detail.contact || st.contact;
+          }
+        } catch (err) {
+          /* fall back to local history */
+        }
+      }
+      studentProfileModal(st);
       break;
     }
     case "student:resetPassword": {
@@ -4617,6 +4634,7 @@ function liveUpsertTeacher(u) {
 function liveUpsertStudent(u) {
   const existing = state.students.find((s) => String(s.id) === String(u.studentId));
   const parts = String(u.studentId || "").split("/");
+  const mappedHistory = mapHistoricalResults(u.historicalResults);
   const rec = {
     id: u.studentId,
     dbId: u.id,
@@ -4640,7 +4658,7 @@ function liveUpsertStudent(u) {
     due: Number(u.feeDue) || 0,
     paid: !(Number(u.feeDue) > 0),
     status: "Active",
-    history: [],
+    history: mappedHistory.length ? mappedHistory : (existing && existing.history) || [],
   };
   if (existing) Object.assign(existing, rec);
   else state.students.push(rec);

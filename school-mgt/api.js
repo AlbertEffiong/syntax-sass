@@ -279,6 +279,9 @@
     listStudents: function (params) {
       return get('/api/admin/students' + buildQuery(params));
     },
+    getStudent: function (id) {
+      return get('/api/admin/students/' + encodeURIComponent(id));
+    },
     updateStudent: function (id, payload) {
       return patch('/api/admin/students/' + encodeURIComponent(id), payload);
     },
