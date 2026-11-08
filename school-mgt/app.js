@@ -705,7 +705,7 @@ function superAdmin() {
         </div>
       </div>
       <div class="row-actions">
-        ${s.pendingPayment && s.pendingPayment.receipt ? `<button class="btn btn-ghost btn-sm" data-action="payment:receipt" data-school-id="${s.id}" data-role="owner">${ic.eye}<span>View Receipt</span></button>` : ""}
+        ${s.pendingPayment ? `<button class="btn btn-ghost btn-sm" data-action="payment:receipt" data-school-id="${s.id}" data-role="owner">${ic.eye}<span>View Receipt</span></button>` : ""}
         <button class="btn btn-green btn-sm" data-action="super:confirmPayment" data-id="${s.id}">${ic.check}<span>Confirm Receipt</span></button>
         <button class="btn btn-danger btn-sm" data-action="super:rejectPayment" data-id="${s.id}">${ic.x}<span>Reject</span></button>
       </div>
