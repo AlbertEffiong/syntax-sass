@@ -7,6 +7,7 @@ import { Assessment } from '../models/Assessment';
 import { ApiError } from '../utils/ApiError';
 import { serializeSchool, SchoolPublic } from '../utils/serialize';
 import { paginate, Paginated, Pagination } from '../utils/pagination';
+import { sendPaymentConfirmedEmail } from '../utils/mailer';
 
 export interface OwnerDashboard {
   mrr: number;
@@ -195,10 +196,20 @@ export async function verifyPayment(input: VerifyPaymentInput): Promise<SchoolPu
     ? school.subscriptionExpiresAt.getTime()
     : Date.now();
 
+  const confirmedRef = pending.reference;
+  const confirmedAmount = pending.amount;
+
   school.subscriptionStatus = 'Active';
   school.subscriptionExpiresAt = new Date(base + 30 * 24 * 60 * 60 * 1000);
   school.pendingPayment = undefined;
   await school.save();
+
+  // Notify the school admin that payment was confirmed and subscription is active.
+  await sendPaymentConfirmedEmail(school.email, school.name, {
+    reference: confirmedRef,
+    amount: confirmedAmount,
+    newExpiry: school.subscriptionExpiresAt,
+  });
 
   return serializeSchool(school);
 }

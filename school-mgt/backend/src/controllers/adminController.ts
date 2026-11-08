@@ -142,6 +142,16 @@ export const reviewAssessmentGroup = asyncHandler(async (req: Request, res: Resp
 /**
  * GET /api/admin/pending-assessments
  */
+export const deleteActivity = asyncHandler(async (req: Request, res: Response) => {
+  await adminService.deleteActivity(requireTenant(req), req.params.id);
+  return ok(res, null, 'Activity removed.');
+});
+
+export const clearActivities = asyncHandler(async (req: Request, res: Response) => {
+  const result = await adminService.clearActivities(requireTenant(req));
+  return ok(res, result, 'Recent activities cleared.');
+});
+
 export const listAssessments = asyncHandler(async (req: Request, res: Response) => {
   const status = (req.query.status as AssessmentStatus | 'all' | undefined) ?? 'Pending Approval';
   const assessments = await adminService.listAssessments(requireTenant(req), status, page(req));

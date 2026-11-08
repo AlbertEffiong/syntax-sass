@@ -451,6 +451,18 @@ export async function listAssessments(
   return result;
 }
 
+export async function deleteActivity(schoolId: string, activityId: string): Promise<void> {
+  const item = await SchoolActivity.findById(activityId);
+  if (!item) throw ApiError.notFound('Activity not found.', 'ACTIVITY_NOT_FOUND');
+  assertSameSchool(item.schoolId, schoolId);
+  await item.deleteOne();
+}
+
+export async function clearActivities(schoolId: string): Promise<{ deleted: number }> {
+  const result = await SchoolActivity.deleteMany({ schoolId });
+  return { deleted: result.deletedCount || 0 };
+}
+
 /**
  * Approves or rejects a teacher's submission. Rejection moves the line back to
  * the teacher as `Revised` with an optional note.

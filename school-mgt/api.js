@@ -315,6 +315,12 @@
     getSubscription: function () {
       return get('/api/admin/subscription');
     },
+    deleteActivity: function (id) {
+      return del('/api/admin/activities/' + encodeURIComponent(id));
+    },
+    clearActivities: function () {
+      return del('/api/admin/activities');
+    },
   };
 
   var teacher = {

@@ -84,4 +84,8 @@ router.post(
 router.get('/subscription', adminController.getSubscription);
 router.get('/subscription/receipt', adminController.getPendingPaymentReceipt);
 
+// --- Recent activity (school dashboard) ---
+router.delete('/activities', adminController.clearActivities);
+router.delete('/activities/:id', validate(idParamsSchema, 'params'), adminController.deleteActivity);
+
 export default router;

@@ -1087,16 +1087,20 @@ function adminDashboard() {
 
   const activity = state.recentActivity || [];
 
-  const activityRows = activity.length ? activity.map((a) => {
+  const activityRows = activity.length ? activity.map((a, idx) => {
     const icon = activityIcon(a.type);
     const cls = activityTone(a.type);
+    const aid = a.id || a._id || "";
     return `
       <div class="list-row">
-        <div style="display:flex;align-items:center;gap:12px">
+        <div style="display:flex;align-items:center;gap:12px;flex:1">
           <div class="stat-icon ${cls}" style="width:38px;height:38px;border-radius:10px">${icon}</div>
           <div style="font-size:13.5px" class="cell-strong">${esc(a.title)}${a.details ? `<br><span class="cell-muted" style="font-size:12px">${esc(a.details)}</span>` : ""}</div>
         </div>
-        <span class="cell-muted">${fmtDate(a.createdAt)}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="cell-muted">${fmtDate(a.createdAt)}</span>
+          <button class="icon-btn danger" data-action="activity:delete" data-id="${esc(aid)}" data-index="${idx}" title="Delete activity">${ic.trash}</button>
+        </div>
       </div>`;
   }).join("") : `<div class="cell-muted" style="padding:22px;text-align:center">No recent activity yet.</div>`;
 
@@ -1174,7 +1178,10 @@ function adminDashboard() {
     </div>
 
     <div class="card" style="margin-top:20px">
-      <div class="card-head" style="padding:0 0 8px;border-bottom:0"><div><h3>Recent Activity</h3><div class="hint">Latest actions across your school</div></div></div>
+      <div class="card-head" style="padding:0 0 8px;border-bottom:0">
+        <div><h3>Recent Activity</h3><div class="hint">Latest actions across your school</div></div>
+        ${activity.length ? `<button class="btn btn-ghost btn-sm danger" data-action="activity:clear" title="Clear all recent activities">${ic.trash}<span>Clear All</span></button>` : ""}
+      </div>
       ${activityRows}
     </div>
   `;
@@ -3604,6 +3611,43 @@ document.addEventListener("click", async (e) => {
       render();
       break;
     }
+    case "activity:delete": {
+      const idx = Number(btn.getAttribute("data-index"));
+      const aid = rawId || "";
+      if (LIVE_API && aid) {
+        try {
+          await SyntaxApi.admin.deleteActivity(aid);
+          await liveLoadAdminData();
+          toast("Activity removed", "The activity entry was deleted.", "success");
+          render();
+        } catch (err) {
+          toast("Delete failed", err.message || "Could not delete this activity.", "error");
+        }
+        break;
+      }
+      if (Array.isArray(state.recentActivity) && idx >= 0) state.recentActivity.splice(idx, 1);
+      toast("Activity removed", "The activity entry was deleted.", "success");
+      render();
+      break;
+    }
+    case "activity:clear": {
+      if (LIVE_API) {
+        try {
+          await SyntaxApi.admin.clearActivities();
+          await liveLoadAdminData();
+          toast("Activities cleared", "Recent activities were removed.", "success");
+          render();
+        } catch (err) {
+          toast("Clear failed", err.message || "Could not clear recent activities.", "error");
+        }
+        break;
+      }
+      state.recentActivity = [];
+      toast("Activities cleared", "Recent activities were removed.", "success");
+      render();
+      break;
+    }
+
     case "assess:revise": {
       const a = state.assessments.find((x) => String(x.id) === String(rawId) || String(x.dbId) === String(rawId));
       const classId = btn.getAttribute("data-class-id") || (a && a.classId) || "";
