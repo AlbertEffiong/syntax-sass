@@ -100,6 +100,8 @@
     var sessionBootstrapPath = [
       '/api/auth/login',
       '/api/auth/verify-otp',
+      '/api/auth/teacher/resend-otp',
+      '/api/auth/resend-otp',
       '/api/student/login',
     ].indexOf(path) !== -1;
 

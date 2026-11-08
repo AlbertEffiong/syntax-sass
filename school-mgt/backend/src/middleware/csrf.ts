@@ -15,6 +15,8 @@ const EXEMPT = new Set([
   'POST /api/auth/login',
   'POST /api/auth/register-school',
   'POST /api/auth/verify-otp',
+  'POST /api/auth/teacher/resend-otp',
+  'POST /api/auth/resend-otp',
   'POST /api/student/login',
 ]);
 
