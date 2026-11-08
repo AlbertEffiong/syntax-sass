@@ -1396,8 +1396,10 @@ function studentModal(st) {
 
 function studentProfileModal(st) {
   if (!st) return;
+  const hist = Array.isArray(st.history) ? st.history : mapHistoricalResults(st.historicalResults);
+  st.history = hist;
   const att = attendanceRate(st);
-  const hist = (st.history || []).slice().reverse();
+  const histRev = hist.slice().reverse();
   const histRows = hist.length ? hist.map((h) => `
     <tr>
       <td>${esc(h.session)}</td>
