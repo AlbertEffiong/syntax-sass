@@ -1394,6 +1394,28 @@ function studentModal(st) {
   `);
 }
 
+function mapHistoricalResult(h) {
+  if (!h) return null;
+  const attStr = String(h.attendance || "").trim();
+  let present = 0, total = 0;
+  const m = attStr.match(/(\d+)\s*\/\s*(\d+)/);
+  if (m) { present = Number(m[1]) || 0; total = Number(m[2]) || 0; }
+  const subjects = Array.isArray(h.subjects) ? h.subjects.map((s) => ({
+    subject: s.subject || "", ca: 0, exam: 0, total: Number(s.score) || 0, grade: s.grade || gradeFor(Number(s.score) || 0), remark: s.remark || "",
+  })) : [];
+  const avg = Number(h.average) || 0;
+  return {
+    session: h.session || "", year: Number(String(h.session || "").slice(0, 4)) || 0, term: h.term || "",
+    cls: h.class || h.cls || "", subjects, total: Number(h.total) || 0, average: avg,
+    position: Number(h.position) || 0, classSize: Number(h.classSize) || 0,
+    attendance: { present, total },
+    remark: h.remark || remarkForGrade(gradeFor(Math.round(avg))),
+  };
+}
+function mapHistoricalResults(list) {
+  return Array.isArray(list) ? list.map(mapHistoricalResult).filter(Boolean) : [];
+}
+
 function studentProfileModal(st) {
   if (!st) return;
   const hist = Array.isArray(st.history) ? st.history : mapHistoricalResults(st.historicalResults);
