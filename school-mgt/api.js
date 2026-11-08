@@ -201,8 +201,13 @@
     verifyOtp: function (payload) {
       return post('/api/auth/verify-otp', payload).then(captureToken);
     },
+    // Teacher self-service OTP resend (public; used on teacher login/activation)
+    resendTeacherOtp: function (payload) {
+      return post('/api/auth/teacher/resend-otp', payload);
+    },
+    // Backward-compatible alias
     resendOtp: function (payload) {
-      return post('/api/auth/resend-otp', payload);
+      return post('/api/auth/teacher/resend-otp', payload);
     },
     me: function () {
       return get('/api/auth/me').then(captureToken);

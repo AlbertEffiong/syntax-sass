@@ -70,6 +70,14 @@ router.get('/me', authenticate, authController.me);
  */
 router.post('/logout', authenticate, authController.logout);
 
+// Teacher self-service: resend activation OTP (public, unverified teachers only)
+router.post(
+  '/teacher/resend-otp',
+  authRateLimiter,
+  validate(z.object({ email: z.string().email() })),
+  authController.resendOtp,
+);
+// Backward-compatible alias
 router.post('/resend-otp', authRateLimiter, validate(z.object({ email: z.string().email() })), authController.resendOtp);
 
 export default router;

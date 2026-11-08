@@ -2954,30 +2954,38 @@ document.addEventListener("click", async (e) => {
     case "teacher:resendOtp": {
       const em = btn.getAttribute("data-email");
       if (em) {
+        // Teacher self-service resend (public endpoint) — no admin session required
         if (LIVE_API) {
           try {
-            await window.SyntaxApi.auth.resendOtp({ email: em });
-            toast("OTP sent", "A new code was emailed.", "success");
+            await window.SyntaxApi.auth.resendTeacherOtp({ email: em });
+            toast("OTP sent", "A new code was emailed to " + em + ".", "success");
           } catch (e) {
             toast("Error", e.message || "Could not resend OTP.", "error");
           }
         }
         break;
       }
+      // Admin-triggered resend (authenticated admin endpoint, tenant-scoped)
       const t = teacherById(rawId);
       if (t) {
         if (LIVE_API) {
-          SyntaxApi.admin.resendTeacherOtp(t.id).then((result) => {
+          try {
+            const result = await SyntaxApi.admin.resendTeacherOtp(t.id);
             liveUpsertTeacher(result.teacher);
             const refreshed = teacherById(t.id);
             if (refreshed) refreshed.otp = result.otp;
             if (refreshed) otpModal(refreshed);
-            toast("OTP resent", `A new verification code was sent to ${t.email}.`, "success");
-          }).catch((err) => toast("OTP resend failed", err.message || "Could not resend the verification code.", "error"));
+            toast("OTP resent", "A new verification code was sent to " + t.email + ".", "success");
+          } catch (err) {
+            const msg = (err && err.status === 401)
+              ? "Your admin session expired or is missing. Please sign in again, then resend the OTP."
+              : (err && err.message) || "Could not resend the verification code.";
+            toast("OTP resend failed", msg, "error");
+          }
         } else {
           t.otp = randomOtp();
           otpModal(t);
-          toast("OTP resent", `A new code was sent to ${t.email}.`, "info");
+          toast("OTP resent", "A new code was sent to " + t.email + ".", "info");
         }
       }
       break;
