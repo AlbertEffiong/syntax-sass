@@ -530,6 +530,11 @@ export async function updateSchoolSettings(
   await school.save();
   return serializeSchool(school);
 }
+
+/**
+ * Reads the tenant's school profile/settings.
+ */
+export async function getSchoolSettings(schoolId: string): Promise<SchoolPublic> {
   const school = await School.findById(schoolId);
   if (!school) {
     throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');

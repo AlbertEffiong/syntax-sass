@@ -170,6 +170,11 @@ export const getSubscription = asyncHandler(async (req: Request, res: Response) 
  * GET /api/admin/school
  * Returns the tenant's school profile/settings.
  */
+export const getSchoolSettings = asyncHandler(async (req: Request, res: Response) => {
+  const school = await adminService.getSchoolSettings(requireTenant(req));
+  return ok(res, school);
+});
+
 export const updateSchoolSettings = asyncHandler(async (req: Request, res: Response) => {
   const school = await adminService.updateSchoolSettings(requireTenant(req), req.body);
   return ok(res, school, 'School profile updated.');
