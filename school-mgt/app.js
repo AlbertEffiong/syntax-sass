@@ -4109,11 +4109,12 @@ document.addEventListener("submit", async (e) => {
           subjects,
           ...(teacherRecord ? { teacherEmail: teacherRecord.email } : {}),
         });
+        const savedTeacher = state.teachers.find((x) => String(x.schoolId) === String(state.school.id) && String(x.email || "").toLowerCase() === String(saved.teacherEmail || "").toLowerCase());
         state.classes.push({
           id: saved.id,
           schoolId: state.school.id,
           name: saved.className,
-          teacher: saved.teacherEmail || "",
+          teacher: (savedTeacher && savedTeacher.name) || saved.teacherEmail || teacher || "",
           subjects: saved.subjects || subjects,
           students: 0,
         });
@@ -4136,9 +4137,10 @@ document.addEventListener("submit", async (e) => {
           if (teacherRecord) payload.teacherEmail = teacherRecord.email;
           const saved = await SyntaxApi.admin.updateClass(id, payload);
           const c = state.classes.find((x) => x.id === id);
+          const savedTeacher = state.teachers.find((x) => String(x.schoolId) === String(state.school.id) && String(x.email || "").toLowerCase() === String(saved.teacherEmail || "").toLowerCase());
           if (c) Object.assign(c, {
             name: saved.className,
-            teacher: saved.teacherEmail || "",
+            teacher: (savedTeacher && savedTeacher.name) || saved.teacherEmail || teacher || "",
             subjects: saved.subjects || subjects,
           });
           toast("Class updated", `${name} and its subjects were saved.`, "success");
@@ -4383,6 +4385,7 @@ function liveUpsertTeacher(u) {
 }
 
 function liveUpsertStudent(u) {
+  const existing = state.students.find((s) => String(s.id) === String(u.studentId));
   const parts = String(u.studentId || "").split("/");
   const rec = {
     id: u.studentId,
@@ -4409,7 +4412,6 @@ function liveUpsertStudent(u) {
     status: "Active",
     history: [],
   };
-  const existing = state.students.find((s) => String(s.id) === String(u.studentId));
   if (existing) Object.assign(existing, rec);
   else state.students.push(rec);
   return state.students.find((s) => String(s.id) === String(u.studentId));
@@ -4444,14 +4446,18 @@ async function liveLoadAdminData() {
   students.forEach((student) => liveUpsertStudent(student));
   state.teachers = state.teachers.filter((teacher) => String(teacher.schoolId) !== schoolId);
   teachers.forEach((teacher) => liveUpsertTeacher(teacher));
-  state.classes = classRows.map((item) => ({
-    id: item.id,
-    schoolId,
-    name: item.className,
-    subjects: item.subjects || [],
-    teacher: item.teacherEmail || "",
-    students: 0,
-  }));
+  state.classes = classRows.map((item) => {
+    const teacherEmail = (item.teacherEmail || "").toLowerCase();
+    const t = teacherEmail ? state.teachers.find((x) => String(x.schoolId) === schoolId && String(x.email || "").toLowerCase() === teacherEmail) : null;
+    return {
+      id: item.id,
+      schoolId,
+      name: item.className,
+      subjects: item.subjects || [],
+      teacher: (t && t.name) || item.teacherEmail || "",
+      students: 0,
+    };
+  });
   state.fees = dashboard.fees || { collected: 0, pending: 0, expected: 0 };
   state.school.students = dashboard.studentCount || 0;
   state.school.teacherCount = dashboard.teacherCount || 0;
@@ -4481,14 +4487,18 @@ async function liveLoadTeacherData() {
       verified: true,
     });
   }
-  state.classes = classRows.map((item) => ({
-    id: item.id,
-    schoolId: school.id,
-    name: item.className,
-    subjects: item.subjects || [],
-    teacher: item.teacherEmail || "",
-    students: 0,
-  }));
+  state.classes = classRows.map((item) => {
+    const teacherEmail = (item.teacherEmail || "").toLowerCase();
+    const t = teacherEmail ? state.teachers.find((x) => String(x.schoolId) === String(school.id) && String(x.email || "").toLowerCase() === teacherEmail) : null;
+    return {
+      id: item.id,
+      schoolId: school.id,
+      name: item.className,
+      subjects: item.subjects || [],
+      teacher: (t && t.name) || item.teacherEmail || "",
+      students: 0,
+    };
+  });
   const firstClass = state.classes[0];
   state.teacherCls = firstClass?.name || "";
   state.teacherSubj = firstClass?.subjects?.[0] || "";

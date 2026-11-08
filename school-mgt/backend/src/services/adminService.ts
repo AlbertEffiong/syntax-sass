@@ -56,6 +56,7 @@ export interface UpdateStudentInput {
   currentClass?: string;
   guardian?: string;
   contact?: string;
+  email?: string;
   address?: string;
   feeExpected?: number;
   feeDue?: number;
@@ -207,6 +208,7 @@ export async function enrollStudent(input: EnrollStudentInput): Promise<StudentP
     currentClass: cls.className,
     guardian: input.guardian ?? '',
     contact: input.contact ?? '',
+    email: (input.email || '').trim().toLowerCase(),
     address: input.address ?? '',
     feeExpected,
     feeCollected: feeExpected - feeDue,
@@ -243,6 +245,7 @@ export async function updateStudent(
   if (patch.currentClass !== undefined) student.currentClass = patch.currentClass;
   if (patch.guardian !== undefined) student.guardian = patch.guardian;
   if (patch.contact !== undefined) student.contact = patch.contact;
+  if (patch.email !== undefined) student.email = (patch.email || '').trim().toLowerCase();
   if (patch.address !== undefined) student.address = patch.address;
   if (patch.feeExpected !== undefined) student.feeExpected = patch.feeExpected;
   if (patch.feeDue !== undefined) student.feeDue = patch.feeDue;
