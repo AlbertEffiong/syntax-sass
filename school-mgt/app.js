@@ -2210,22 +2210,20 @@ function ensureScores(cls, subj) {
 }
 
 function teacherApp() {
-  const me = teacherById(state.auth.teacher && state.auth.teacher.teacherId);
-  const tab = state.teacherTab === "upload" ? "upload" : "manual";
-  const classOptions = schoolClassOptions();
+const schoolName = (state.school && state.school.name) || "School";
 
   if (!classOptions.length) {
     return `
     <div class="page">
       <div class="page-head">
         <div>
-          <div class="eyebrow">Teacher Portal · ${esc(state.school.name)}</div>
-          <h1>${me ? esc(me.name) : "Score Entry"} — Broadsheet</h1>
-          <div class="sub">Curriculum-driven score entry.</div>
+<div class="eyebrow">Teacher Portal · ${esc(schoolName)}</div>
+        <h1>${me ? esc(me.name) : "Score Entry"} — Broadsheet</h1>
+        <div class="sub">Curriculum-driven score entry.</div>
         </div>
       </div>
       <div class="card"><div class="cell-muted" style="padding:34px;text-align:center">
-        No classes are configured for ${esc(state.school.name)} yet.<br>
+        No classes are configured for ${esc(schoolName)} yet.<br>
         A School Admin must create classes and tag their subjects under <strong>Classes &amp; Subjects</strong> first.
       </div></div>
     </div>`;
@@ -2260,7 +2258,7 @@ function teacherApp() {
   const principalField = `
         <div class="field">
           <label for="t-principal">Principal Name</label>
-          <input class="input" id="t-principal" data-action="principal:set" value="${esc(principalName(state.school))}" placeholder="e.g. A. Bello" autocomplete="off" />
+          <input class="input" id="t-principal" data-action="principal:set" value="${esc(principalName(state.school || {}))}" placeholder="e.g. A. Bello" autocomplete="off" />
           <span class="hint">Attached to reports &amp; approval sheets</span>
         </div>`;
 
@@ -2334,7 +2332,7 @@ function teacherApp() {
   <div class="page">
     <div class="page-head">
       <div>
-        <div class="eyebrow">Teacher Portal · ${esc(state.school.name)}</div>
+        <div class="eyebrow">Teacher Portal · ${esc(schoolName)}</div>
         <h1>${me ? esc(me.name) : "Score Entry"} — Broadsheet</h1>
         <div class="sub">${me ? esc(me.subject) + " · " : ""}Enter CA and exam scores, or upload a compiled sheet — totals and grades are computed automatically. Classes &amp; subjects are synced strictly to the Admin <strong>Classes &amp; Subjects</strong> curriculum.</div>
       </div>
