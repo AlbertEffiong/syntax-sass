@@ -187,3 +187,17 @@ export async function verifyPayment(input: VerifyPaymentInput): Promise<SchoolPu
 
   return serializeSchool(school);
 }
+
+/** Rejects a pending bank transfer submission (does not activate subscription). */
+export async function rejectPayment(input: { schoolId: string; reference?: string }): Promise<SchoolPublic> {
+  const school = await School.findById(input.schoolId);
+  if (!school) {
+    throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');
+  }
+  if (!school.pendingPayment) {
+    throw ApiError.badRequest('No pending bank transfer found for this school.', 'NO_PENDING_PAYMENT');
+  }
+  school.pendingPayment = undefined;
+  await school.save();
+  return serializeSchool(school);
+}

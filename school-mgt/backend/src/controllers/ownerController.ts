@@ -56,5 +56,11 @@ export const deleteSchool = asyncHandler(async (req: Request, res: Response) => 
 export const verifyPayment = asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as VerifyPaymentBody;
   const school = await ownerService.verifyPayment(body);
-  return ok(res, school, 'Payment verified. Subscription reactivated for 30 days.');
+  return ok(res, school, 'Payment verified and subscription renewed for 30 days.');
+});
+
+export const rejectPayment = asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as { schoolId: string; reference?: string };
+  const school = await ownerService.rejectPayment(body);
+  return ok(res, school, 'Payment submission rejected.');
 });

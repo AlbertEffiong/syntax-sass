@@ -240,6 +240,9 @@
     verifyPayment: function (payload) {
       return post('/api/owner/verify-payment', payload);
     },
+    rejectPayment: function (payload) {
+      return post('/api/owner/reject-payment', payload);
+    },
   };
 
   var admin = {

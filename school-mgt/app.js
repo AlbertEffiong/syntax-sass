@@ -2249,6 +2249,7 @@ function assessmentDetailsModal(details) {
   `);
 }
 
+function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 function rosterFor(cls) {
   const sid = state.school ? state.school.id : (state.auth && state.auth.admin ? state.auth.admin.schoolId : null);
@@ -3273,27 +3274,56 @@ document.addEventListener("click", async (e) => {
     }
 
     case "super:confirmPayment": {
-      const school = state.schools.find((s) => s.id === id);
-      if (school && school.pendingPayment) {
-        delete school.pendingPayment;
-        school.status = "active";
-        school.renewal = addDays(new Date().toISOString().slice(0, 10), 30);
-        closeModal();
-        toast("Payment verified", `${school.name}'s bank transfer confirmed. Subscription renewed for 30 days.`, "success");
-        render();
+      const school = state.schools.find((s) => String(s.id) === String(rawId));
+      if (!school || !school.pendingPayment) break;
+      if (LIVE_API) {
+        try {
+          const ref = school.pendingPayment.reference;
+          if (!ref) { toast("Cannot confirm", "No payment reference found for this submission.", "error"); break; }
+          const updated = await window.SyntaxApi.owner.verifyPayment({
+            schoolId: rawId,
+            reference: ref,
+            amount: school.pendingPayment.amount || school.plan,
+          });
+          liveUpsertSchool(updated);
+          if (state.school && String(state.school.id) === String(rawId)) state.school = schoolById(rawId);
+          toast("Payment verified", `${school.name}'s bank transfer confirmed. Subscription activated.`, "success");
+          render();
+        } catch (err) {
+          toast("Verification failed", err.message || "Could not confirm this payment.", "error");
+        }
+        break;
       }
+      delete school.pendingPayment;
+      school.status = "active";
+      school.renewal = addDays(new Date().toISOString().slice(0, 10), 30);
+      closeModal();
+      toast("Payment verified", `${school.name}'s bank transfer confirmed. Subscription renewed for 30 days.`, "success");
+      render();
       break;
     }
 
     case "super:rejectPayment": {
-      const school = state.schools.find((s) => s.id === id);
-      if (school && school.pendingPayment) {
-        delete school.pendingPayment;
-        if (state.school && state.school.id === school.id) delete state.school.pendingPayment;
-        closeModal();
-        toast("Payment rejected", `${school.name}'s transfer could not be matched. Contact the school admin.`, "error");
-        render();
+      const school = state.schools.find((s) => String(s.id) === String(rawId));
+      if (!school || !school.pendingPayment) break;
+      if (LIVE_API) {
+        try {
+          const ref = school.pendingPayment.reference || "rejected";
+          const updated = await window.SyntaxApi.owner.rejectPayment({ schoolId: rawId, reference: ref });
+          liveUpsertSchool(updated);
+          if (state.school && String(state.school.id) === String(rawId)) state.school = schoolById(rawId);
+          toast("Payment rejected", `${school.name}'s transfer was rejected.`, "error");
+          render();
+        } catch (err) {
+          toast("Reject failed", err.message || "Could not reject this payment.", "error");
+        }
+        break;
       }
+      delete school.pendingPayment;
+      if (state.school && String(state.school.id) === String(rawId)) delete state.school.pendingPayment;
+      closeModal();
+      toast("Payment rejected", `${school.name}'s transfer could not be matched. Contact the school admin.`, "error");
+      render();
       break;
     }
 

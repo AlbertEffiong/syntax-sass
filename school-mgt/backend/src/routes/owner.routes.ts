@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import * as ownerController from '../controllers/ownerController';
 import { authenticate, authorize } from '../middleware/auth';
 import { validate } from '../middleware/validate';
@@ -10,6 +11,11 @@ import {
 } from '../validators/owner.validators';
 
 const router = Router();
+
+const rejectPaymentSchema = z.object({
+  schoolId: z.string().min(1),
+  reference: z.string().trim().optional(),
+});
 
 // Every owner route requires an authenticated SaaS owner.
 router.use(authenticate, authorize('owner'));
@@ -68,5 +74,6 @@ router.delete(
  * @access Owner
  */
 router.post('/verify-payment', validate(verifyPaymentSchema), ownerController.verifyPayment);
+router.post('/reject-payment', validate(rejectPaymentSchema), ownerController.rejectPayment);
 
 export default router;
