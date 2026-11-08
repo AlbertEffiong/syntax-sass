@@ -119,7 +119,7 @@ export async function registerSchool(input: RegisterSchoolInput): Promise<Regist
     .then(() => {
       if (env.isProduction) console.log(`[mail] School credentials sent to ${email} for ${input.name}.`);
     })
-    .catch((err) => console.error(`[mail] Failed to send school credentials for ${email}:`, (err as Error).message));
+    .catch((err: unknown) => console.error(`[mail] Failed to send school credentials for ${email}:`, err instanceof Error ? err.message : String(err)));
 
   const result: RegisterSchoolResult = { school: serializeSchool(school) };
   if (!env.isProduction) result.password = plaintextPassword;

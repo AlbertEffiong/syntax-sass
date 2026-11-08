@@ -324,6 +324,9 @@
     submitBroadsheet: function (payload) {
       return post('/api/teacher/broadsheet/submit', payload);
     },
+    notifyAdminSetup: function () {
+      return post('/api/teacher/notify-admin-setup', {});
+    },
     traits: {
       get: function (studentId, params) {
         return get('/api/teacher/students/' + encodeURIComponent(studentId) + '/traits' + buildQuery(params));

@@ -2,11 +2,13 @@ import { Types } from 'mongoose';
 import { ClassModel } from '../models/Class';
 import { School } from '../models/School';
 import { Student } from '../models/Student';
+import { Teacher } from '../models/Teacher';
 import { Assessment } from '../models/Assessment';
 import { ApiError } from '../utils/ApiError';
 import { computeTotal, gradeFor } from '../utils/grading';
 import { serializeClass, ClassPublic, serializeAssessment, AssessmentPublic, serializeSchool } from '../utils/serialize';
 import { recordSchoolActivity } from '../utils/activity';
+import { sendAdminSetupReminder } from '../utils/mailer';
 
 export interface ScoreEntry {
   studentId: string;
@@ -228,4 +230,37 @@ export async function getBroadsheet(
 function clamp(value: number, max: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(max, Math.round(value)));
+}
+
+/**
+ * Teacher-triggered reminder: emails the school admin to configure
+ * Classes & Subjects (curriculum) when none exist yet.
+ */
+export async function notifyAdminSetup(schoolId: string, teacherId: string): Promise<{ sent: boolean; adminEmail: string }> {
+  const [school, teacher] = await Promise.all([
+    School.findById(schoolId),
+    Teacher.findById(teacherId),
+  ]);
+  if (!school) throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');
+  if (!teacher) throw ApiError.notFound('Teacher not found.', 'TEACHER_NOT_FOUND');
+  if (String(teacher.schoolId) !== String(schoolId)) {
+    throw ApiError.forbidden('Teacher does not belong to this school.', 'IDOR_BLOCKED');
+  }
+  const adminEmail = (school.email || '').trim();
+  if (!adminEmail) {
+    throw ApiError.badRequest('This school has no admin email configured.', 'NO_ADMIN_EMAIL');
+  }
+  await sendAdminSetupReminder(
+    adminEmail,
+    school.name || 'your school',
+    teacher.name || 'A teacher',
+    teacher.email || '',
+  );
+  await recordSchoolActivity(
+    schoolId,
+    'class.updated',
+    'Curriculum setup reminder sent',
+    `${teacher.name || 'A teacher'} (${teacher.email || '—'}) asked the admin to configure Classes & Subjects.`,
+  );
+  return { sent: true, adminEmail };
 }

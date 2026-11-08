@@ -107,3 +107,30 @@ export function sendSchoolCredentials(
       `Keep this password safe. You will be asked to change it on first sign-in.`,
   });
 }
+
+/**
+ * Reminder to a school admin that a teacher cannot proceed because the admin
+ * curriculum (classes/subjects) has not been configured.
+ */
+export function sendAdminSetupReminder(
+  adminEmail: string,
+  schoolName: string,
+  teacherName: string,
+  teacherEmail: string,
+): Promise<void> {
+  return sendMail({
+    to: adminEmail,
+    subject: `Action needed: set up classes & subjects for ${schoolName}`,
+    html:
+      `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px">` +
+      `<h2 style="color:#4f46e5">Classes &amp; Subjects setup required</h2>` +
+      `<p><strong>${teacherName}</strong> (${teacherEmail}) signed in to the Teacher Portal for <strong>${schoolName}</strong>, ` +
+      `but cannot enter or submit scores because no classes/subjects have been configured yet.</p>` +
+      `<p>Please sign in to the School Admin portal and set up <strong>Classes &amp; Subjects</strong> (curriculum) so teachers can access their broadsheets.</p>` +
+      `</div>`,
+    text:
+      `${teacherName} (${teacherEmail}) signed in to the Teacher Portal for ${schoolName}, but cannot proceed because no classes/subjects are configured.\n\n` +
+      `Please sign in to the School Admin portal and set up Classes & Subjects (curriculum) so teachers can access their broadsheets.`,
+  });
+}
+

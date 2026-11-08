@@ -81,6 +81,11 @@ function requireTeacherId(req: Request): string {
   return req.user.id;
 }
 
+export const notifyAdminSetup = asyncHandler(async (req: Request, res: Response) => {
+  const result = await teacherService.notifyAdminSetup(requireTenant(req), requireTeacherId(req));
+  return ok(res, result, 'Admin notified to set up Classes & Subjects.');
+});
+
 function requireTeacherEmail(req: Request): string {
   if (!req.user?.email) {
     throw ApiError.badRequest('The authenticated teacher has no email on record.', 'NO_TEACHER_EMAIL');

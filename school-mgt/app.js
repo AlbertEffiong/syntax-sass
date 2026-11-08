@@ -2224,6 +2224,10 @@ const classOptions = schoolClassOptions();
       <div class="card"><div class="cell-muted" style="padding:34px;text-align:center">
         No classes are configured for ${esc(schoolName)} yet.<br>
         A School Admin must create classes and tag their subjects under <strong>Classes &amp; Subjects</strong> first.
+        <div style="margin-top:18px">
+          <button class="btn btn-primary" data-action="teacher:notifyAdminSetup">${ic.bell}<span>Notify Admin to Set Up Classes</span></button>
+          <div class="sub" style="margin-top:8px">Sends an email reminder to the school admin.</div>
+        </div>
       </div></div>
     </div>`;
   }
@@ -3279,6 +3283,22 @@ document.addEventListener("click", async (e) => {
           liveLoadTeacherBroadsheet(name, state.teacherSubj).then(render)
             .catch((err) => toast("Broadsheet load failed", err.message || "Could not load this class roster.", "error"));
         } else render();
+      }
+      break;
+    }
+
+    case "teacher:notifyAdminSetup": {
+      if (!LIVE_API) { toast("Demo mode", "Connect the live API to send an admin reminder email.", "info"); break; }
+      const btnEl = btn;
+      const prev = btnEl ? btnEl.innerHTML : "";
+      if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = `${ic.clock}<span>Sending…</span>`; }
+      try {
+        const result = await SyntaxApi.teacher.notifyAdminSetup();
+        toast("Admin notified", `A reminder email was sent to ${result && result.adminEmail ? result.adminEmail : "the school admin"} to set up Classes & Subjects.`, "success");
+      } catch (err) {
+        toast("Could not notify admin", (err && err.message) || "Failed to send the reminder email.", "error");
+      } finally {
+        if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = prev || `${ic.bell}<span>Notify Admin to Set Up Classes</span>`; }
       }
       break;
     }

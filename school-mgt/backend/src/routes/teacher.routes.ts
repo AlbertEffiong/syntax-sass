@@ -28,6 +28,9 @@ router.get('/classes-subjects', teacherController.getClassesSubjects);
 router.get('/context', teacherController.getContext);
 router.get('/roster', validate(rosterQuerySchema, 'query'), teacherController.getClassRoster);
 
+// Teacher notifies school admin to configure curriculum when classes are missing
+router.post('/notify-admin-setup', teacherController.notifyAdminSetup);
+
 /**
  * @route  GET /api/teacher/broadsheet
  * @desc   Fetch a saved broadsheet for a class + subject + term.
