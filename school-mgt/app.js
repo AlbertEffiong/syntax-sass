@@ -1862,7 +1862,7 @@ function studentTraitsModal(studentId, studentName, traits) {
       <div><h3>Student Traits</h3><div class="sub">${esc(studentName)} · ${esc(studentId)}</div></div>
       <button class="close-x" data-action="modal:close">${ic.x}</button>
     </div>
-    <form data-action="form:saveTraits" data-student-id="${esc(studentId)}" data-term="${esc(term)}" data-session="${esc(session)}">
+    <form data-action="form:saveTraits" data-student-id="${esc(studentId)}" data-student-name="${esc(studentName)}" data-term="${esc(term)}" data-session="${esc(session)}">
       <div class="modal-body">
         <div class="field"><label>Affective Traits</label><div class="trait-grid">${affectiveRows}</div></div>
         <div class="field" style="margin-top:12px"><label>Psychomotor Traits</label><div class="trait-grid">${psychomotorRows}</div></div>
@@ -4047,6 +4047,7 @@ document.addEventListener("submit", async (e) => {
   if (action === "form:saveTraits") {
     const data = new FormData(form);
     const studentId = form.getAttribute("data-student-id");
+    const studentName = form.getAttribute("data-student-name") || "";
     const term = form.getAttribute("data-term");
     const session = form.getAttribute("data-session");
     const affective = [];
@@ -4082,7 +4083,7 @@ document.addEventListener("submit", async (e) => {
           if (!session) throw new Error("Academic session is missing. Ask the admin to set the current session, or reload.");
           await SyntaxApi.teacher.traits.upsert(studentId, { ...payload, term, session });
           closeModal();
-          toast("Traits saved", `${studentId} traits saved for ${esc(term)} ${esc(session)}.`);
+          toast("Traits saved", `${studentName || "Student"}'s traits were saved for ${term} ${session}.`, "success");
           render();
         } catch (err) {
           toast("Failed to save traits", err.message || "Could not save student traits.", "error");
@@ -4095,7 +4096,7 @@ document.addEventListener("submit", async (e) => {
         st.psychomotor = psychomotorOut;
       }
       closeModal();
-      toast("Traits saved", `${studentId} traits saved for ${esc(term)} ${esc(session)}.`);
+      toast("Traits saved", `${studentName || "Student"}'s traits were saved for ${term} ${session}.`, "success");
       render();
     }
   }
