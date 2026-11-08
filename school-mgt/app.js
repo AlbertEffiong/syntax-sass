@@ -2211,6 +2211,7 @@ function ensureScores(cls, subj) {
 
 function teacherApp() {
 const schoolName = (state.school && state.school.name) || "School";
+const classOptions = schoolClassOptions();
 
   if (!classOptions.length) {
     return `
