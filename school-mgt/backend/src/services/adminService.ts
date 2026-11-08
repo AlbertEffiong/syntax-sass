@@ -9,7 +9,7 @@ import { ApiError } from '../utils/ApiError';
 import { sendStudentCredentials } from '../utils/mailer';
 import { assertSameSchool } from '../utils/security';
 import { generateStudentId } from '../utils/studentId';
-import { hashPassword } from '../utils/password';
+import { hashPassword, verifyPassword } from '../utils/password';
 import { paginate, Paginated, Pagination } from '../utils/pagination';
 import { cache } from '../utils/cache';
 import { recordSchoolActivity } from '../utils/activity';
@@ -514,7 +514,22 @@ export interface AcademicSettingInput {
 /**
  * Reads the tenant's school profile/settings.
  */
-export async function getSchoolSettings(schoolId: string): Promise<SchoolPublic> {
+export async function updateSchoolSettings(
+  schoolId: string,
+  patch: { principalName?: string; currentPassword?: string; newPassword?: string },
+): Promise<SchoolPublic> {
+  const school = await School.findById(schoolId).select('+password');
+  if (!school) throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');
+  if (patch.principalName !== undefined) school.principalName = patch.principalName;
+  if (patch.newPassword) {
+    if (!patch.currentPassword) throw ApiError.badRequest('Current password required.', 'CURRENT_PASSWORD_REQUIRED');
+    const ok = await verifyPassword(patch.currentPassword, school.password);
+    if (!ok) throw ApiError.unauthorized('Current password is incorrect.', 'INVALID_PASSWORD');
+    school.password = await hashPassword(patch.newPassword);
+  }
+  await school.save();
+  return serializeSchool(school);
+}
   const school = await School.findById(schoolId);
   if (!school) {
     throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');

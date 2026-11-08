@@ -26,6 +26,7 @@ router.use(authenticate, authorize('admin'), enforceTenant);
 
 // --- School profile & academic calendar ---
 router.get('/school', adminController.getSchoolSettings);
+router.patch('/school', adminController.updateSchoolSettings);
 router.get('/dashboard', adminController.getDashboard);
 router.patch('/debtor-control', validate(debtorControlSchema), adminController.updateDebtorControl);
 router.patch('/academic-setting', validate(academicSettingSchema), adminController.updateAcademicSetting);

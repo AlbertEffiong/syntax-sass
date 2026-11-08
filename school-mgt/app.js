@@ -857,10 +857,6 @@ function newSchoolModal() {
             </select>
           </div>
         </div>
-        <div class="field">
-          <label for="ns-renewal">Next Monthly Renewal Date</label>
-          <input class="input" id="ns-renewal" name="renewal" type="date" value="${addDays(new Date().toISOString().slice(0, 10), 30)}" required />
-          <span class="hint">The system will auto-lock this school if payment is not received by this date.</span>
         </div>
       </div>
       <div class="modal-foot">
@@ -1957,7 +1953,7 @@ function adminFees() {
   return `
     <div class="page-head">
       <div><h1>Fee Management</h1><div class="sub">Track collections and outstanding balances.</div></div>
-      <div class="page-head-actions"><button class="btn btn-primary" data-action="noop">${ic.wallet}<span>New Invoice</span></button></div>
+      <div class="page-head-actions"><button class="btn btn-primary" data-action="fee:newInvoice">${ic.wallet}<span>New Invoice</span></button></div>
     </div>
     <div class="grid grid-3" style="margin-bottom:20px">
       <div class="card stat"><div class="stat-icon green">${ic.wallet}</div><div class="stat-value" style="font-size:24px;margin-top:12px">${money(state.fees.collected)}</div><div class="stat-label">Collected</div></div>
@@ -2897,7 +2893,10 @@ document.addEventListener("click", async (e) => {
   const id = Number(rawId);
 
   switch (action) {
-    case "noop":
+     case "fee:newInvoice":
+       toast("Coming soon", "Invoice creation is not yet available.", "info");
+       break;
+     case "noop":
       e.preventDefault();
       toast("Demo action", "This control is illustrative in the prototype.", "info");
       break;
@@ -3635,7 +3634,6 @@ document.addEventListener("submit", async (e) => {
       address: "—",
       students: Number(data.get("students")) || 0,
       status: "active",
-      renewal: data.get("renewal"),
       plan: Number(data.get("plan")) || 49,
       adminEmail,
       password: DEFAULT_ADMIN_PASSWORD,
@@ -3727,6 +3725,7 @@ document.addEventListener("submit", async (e) => {
         closeModal();
         teacherInviteCredentialsModal(teacher, initialPassword);
         toast("Invite sent", `Verification instructions sent to ${email}.`, "success");
+        render();
       } catch (err) {
         toast("Invite failed", err.message || "Could not invite this teacher.", "error");
       }
