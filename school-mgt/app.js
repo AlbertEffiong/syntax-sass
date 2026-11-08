@@ -4279,7 +4279,7 @@ document.addEventListener("submit", async (e) => {
           name: saved.className,
           teacher: (savedTeacher && savedTeacher.name) || saved.teacherEmail || teacher || "",
           subjects: saved.subjects || subjects,
-          students: 0,
+    students: Number(u.studentCount ?? u.students ?? 0),
         });
         closeModal();
         toast("Class created", `${name} added to this school's curriculum.`, "success");

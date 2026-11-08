@@ -1,3 +1,4 @@
+import { Types } from 'mongoose';
 import { School, isSubscriptionActive } from '../models/School';
 import { Student } from '../models/Student';
 import { Teacher } from '../models/Teacher';
@@ -29,6 +30,7 @@ export interface ListSchoolsFilter extends Pagination {
 
 export interface SchoolSummary extends SchoolPublic {
   isActive: boolean;
+  studentCount: number;
 }
 
 function escapeRegex(value: string): string {
@@ -60,7 +62,20 @@ export async function listSchools(filter: ListSchoolsFilter): Promise<Paginated<
     School.countDocuments(query),
   ]);
 
-  const items = rows.map((s) => ({ ...serializeSchool(s), isActive: isSubscriptionActive(s) }));
+  const schoolIds = rows.map((s) => s._id);
+  const counts = schoolIds.length
+    ? await Student.aggregate<{ _id: Types.ObjectId; count: number }>([
+        { $match: { schoolId: { $in: schoolIds } } },
+        { $group: { _id: '$schoolId', count: { $sum: 1 } } },
+      ])
+    : [];
+  const countBySchool = new Map(counts.map((c) => [String(c._id), c.count]));
+
+  const items = rows.map((s) => ({
+    ...serializeSchool(s),
+    isActive: isSubscriptionActive(s),
+    studentCount: countBySchool.get(String(s._id)) || 0,
+  }));
   return paginate(items, total, filter.page, filter.limit);
 }
 
