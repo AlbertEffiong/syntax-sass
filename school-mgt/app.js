@@ -4591,6 +4591,7 @@ async function liveRestore() {
       const t = liveUpsertTeacher({ id: u.id, schoolId: u.schoolId, name: u.email, email: u.email, verified: true });
       state.auth.tier = "teacher";
       state.auth.teacher = { loggedIn: true, teacherId: t.id, email: u.email };
+      try { await liveLoadTeacherData(); } catch (e) {}
     } else if (u.role === "student") {
       liveUpsertStudent({ studentId: u.email, schoolId: u.schoolId });
       state.school = Object.assign({}, state.school || {}, { id: u.schoolId, name: "School", restrictDebtors: false });
