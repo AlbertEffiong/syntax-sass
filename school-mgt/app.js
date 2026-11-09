@@ -4635,7 +4635,7 @@ function liveUpsertSchool(u) {
     name: u.name,
     tag: "",
     address: "—",
-    students: 0,
+    students: Number(u.studentCount ?? u.students ?? 0),
     status: liveMapStatus(u.subscriptionStatus),
     renewal: iso,
     plan: u.planMonthly || 0,
