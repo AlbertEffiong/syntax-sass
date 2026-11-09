@@ -882,7 +882,6 @@ function newSchoolModal() {
             </select>
           </div>
         </div>
-        </div>
       </div>
       <div class="modal-foot">
         <button type="button" class="btn btn-ghost" data-action="modal:close">Cancel</button>
