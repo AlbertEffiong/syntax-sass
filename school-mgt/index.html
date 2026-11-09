@@ -21,6 +21,19 @@
   <div id="modal-root"></div>
   <div id="toast-root" class="toast-root" aria-live="assertive"></div>
 
+  <!-- Global page loader -->
+  <div id="page-loader" class="page-loader" aria-live="polite" aria-busy="false">
+    <div class="page-loader-inner">
+      <div class="page-loader-spinner">
+        <svg class="spin" viewBox="0 0 50 50" width="48" height="48" aria-hidden="true">
+          <circle class="page-loader-track" cx="25" cy="25" r="22" fill="none" stroke-width="4"/>
+          <circle class="page-loader-dash" cx="25" cy="25" r="22" fill="none" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="page-loader-text">Loading…</div>
+    </div>
+  </div>
+
   <script>
     // Point the frontend at the Syntax SaaS backend. Override as needed.
     window.API_CONFIG = { baseUrl: "https://syntax-sass.onrender.com", authMode: "bearer", useLiveApi: true };

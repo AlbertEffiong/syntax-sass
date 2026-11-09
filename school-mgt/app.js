@@ -526,6 +526,29 @@ function renderTopbar(showMenu) {
 }
 
 /* ----------------------------- Root render ----------------------------- */
+function showPageLoader(text) {
+  const el = $("#page-loader");
+  if (!el) return;
+  const txt = el.querySelector(".page-loader-text");
+  if (txt) txt.textContent = text || "Loading…";
+  el.classList.add("show");
+  el.setAttribute("aria-busy", "true");
+}
+function hidePageLoader() {
+  const el = $("#page-loader");
+  if (!el) return;
+  el.classList.remove("show");
+  el.setAttribute("aria-busy", "false");
+  setTimeout(() => { if (!el.classList.contains("show")) el.classList.add("hide"); }, 250);
+}
+
+function renderWithLoader(label) {
+  showPageLoader(label);
+  requestAnimationFrame(() => {
+    render();
+  });
+}
+
 function render() {
   const app = $("#app");
   const a = state.auth;
@@ -559,6 +582,7 @@ function render() {
   enhanceInputs(document);
   tipHide();
   window.scrollTo(0, 0);
+  hidePageLoader();
 }
 
 /* ============================================================
@@ -3007,7 +3031,7 @@ document.addEventListener("click", async (e) => {
 
     case "auth:tab":
       state.auth.tab = btn.getAttribute("data-tab");
-      render();
+      renderWithLoader();
       break;
     case "auth:logout":
       if (LIVE_API) { try { SyntaxApi.auth.logout(); } catch (e) {} }
@@ -3018,7 +3042,7 @@ document.addEventListener("click", async (e) => {
       state.auth.student = { loggedIn: false, id: "", term: "First Term" };
       state.adminSection = "dashboard";
       closeModal();
-      render();
+      renderWithLoader();
       break;
 
     case "sidebar:toggle":
@@ -3031,7 +3055,7 @@ document.addEventListener("click", async (e) => {
     case "admin:nav":
       state.adminSection = btn.getAttribute("data-section");
       setNavOpen(false);
-      render();
+      renderWithLoader("Switching…");
       if (LIVE_API && state.adminSection === "subscription") {
         SyntaxApi.admin.getSubscription().then((subscription) => {
           liveUpsertSchool(subscription);
@@ -3254,7 +3278,7 @@ document.addEventListener("click", async (e) => {
     }
     case "super:filter": {
       state.ownerFilter = btn.getAttribute("data-value") || "all";
-      render();
+      renderWithLoader();
       break;
     }
 
@@ -3392,7 +3416,7 @@ document.addEventListener("click", async (e) => {
     case "teacher:tab": {
       const which = btn.getAttribute("data-tab");
       state.teacherTab = which === "upload" ? "upload" : "manual";
-      render();
+      renderWithLoader();
       break;
     }
     case "teacher:template": {
