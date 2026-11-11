@@ -44,7 +44,7 @@ export const env = {
   },
 
   /** Strict allowlist of frontend origins permitted by CORS. */
-  corsOrigins: read('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173')
+  corsOrigins: read('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173,https://www.syntaxsass.com,https://syntax-sass.onrender.com')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
