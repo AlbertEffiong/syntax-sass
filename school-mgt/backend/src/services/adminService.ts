@@ -32,6 +32,14 @@ export interface CreateClassInput {
   className: string;
   subjects: string[];
   teacherEmail?: string;
+  feeExpected?: number;
+}
+
+export interface UpdateClassInput {
+  className?: string;
+  subjects?: string[];
+  teacherEmail?: string;
+  feeExpected?: number;
 }
 
 export interface EnrollStudentInput {
@@ -117,6 +125,7 @@ export async function createClass(input: CreateClassInput): Promise<ClassPublic>
     className: input.className.trim(),
     subjects,
     teacherEmail: input.teacherEmail?.toLowerCase(),
+    feeExpected: Number(input.feeExpected ?? 0),
   });
   await recordSchoolActivity(input.schoolId, 'class.created', 'Class added', `${cls.className} added to the school curriculum.`);
   return serializeClass(cls);
@@ -129,7 +138,7 @@ export async function createClass(input: CreateClassInput): Promise<ClassPublic>
 export async function updateClass(
   schoolId: string,
   classId: string,
-  patch: { className?: string; subjects?: string[]; teacherEmail?: string },
+  patch: UpdateClassInput,
 ): Promise<ClassPublic> {
   const cls = await ClassModel.findById(classId);
   if (!cls) {
@@ -163,6 +172,9 @@ export async function updateClass(
   }
   if (patch.teacherEmail !== undefined) {
     cls.teacherEmail = patch.teacherEmail?.toLowerCase().trim() || undefined;
+  }
+  if (patch.feeExpected !== undefined) {
+    cls.feeExpected = Number(patch.feeExpected) || 0;
   }
 
   await cls.save();
@@ -204,8 +216,10 @@ export async function enrollStudent(input: EnrollStudentInput): Promise<StudentP
 
   const studentId = await generateStudentId(school.uniqueSchoolPrefix);
   const password = await hashPassword(input.password);
-  const feeExpected = input.feeExpected ?? input.feeDue ?? 0;
-  const feeDue = input.feeDue ?? feeExpected;
+  // Fees are driven by the class curriculum, not free-text on the student.
+  const classFee = Number(cls.feeExpected ?? 0);
+  const feeExpected = classFee;
+  const feeDue = Math.min(input.feeDue ?? classFee, classFee);
   if (feeDue > feeExpected) {
     throw ApiError.badRequest('Amount due cannot exceed the expected fee.', 'INVALID_FEE_BALANCE');
   }

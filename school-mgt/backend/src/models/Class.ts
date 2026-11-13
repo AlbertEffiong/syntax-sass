@@ -11,6 +11,8 @@ export interface IClass {
   subjects: string[];
   /** Optional default teacher (email) assigned to the class. */
   teacherEmail?: string;
+  /** Fixed termly/total fee for this class (set when the class is created/edited). */
+  feeExpected?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,6 +30,7 @@ const classSchema = new Schema<IClassDocument>(
         Array.from(new Set((values ?? []).map((s) => String(s).trim()).filter(Boolean))),
     },
     teacherEmail: { type: String, lowercase: true, trim: true },
+    feeExpected: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true },
 );

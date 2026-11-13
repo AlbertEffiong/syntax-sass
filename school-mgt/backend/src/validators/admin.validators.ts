@@ -6,6 +6,7 @@ export const createClassSchema = z.object({
   className: z.string().min(1, 'Class name is required.').trim(),
   subjects: z.array(z.string().trim().min(1)).min(1, 'At least one subject is required.'),
   teacherEmail: emailSchema.optional(),
+  feeExpected: z.number().nonnegative().optional(),
 });
 
 export const enrollStudentSchema = z.object({
@@ -108,9 +109,10 @@ export const updateClassSchema = z
     className: z.string().min(1).trim().optional(),
     subjects: z.array(z.string().trim().min(1)).min(1).optional(),
     teacherEmail: emailSchema.optional(),
+    feeExpected: z.number().nonnegative().optional(),
   })
   .refine(
-    (v) => v.className !== undefined || v.subjects !== undefined || v.teacherEmail !== undefined,
+    (v) => v.className !== undefined || v.subjects !== undefined || v.teacherEmail !== undefined || v.feeExpected !== undefined,
     { message: 'Provide at least one field to update.' },
   );
 

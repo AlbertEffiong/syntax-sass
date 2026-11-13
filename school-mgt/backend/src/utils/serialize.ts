@@ -99,6 +99,7 @@ export interface ClassPublic {
   className: string;
   subjects: string[];
   teacherEmail?: string;
+  feeExpected?: number;
 }
 
 export function serializeClass(cls: IClassDocument): ClassPublic {
@@ -107,6 +108,7 @@ export function serializeClass(cls: IClassDocument): ClassPublic {
     className: cls.className,
     subjects: cls.subjects,
     teacherEmail: cls.teacherEmail,
+    feeExpected: Number(cls.feeExpected ?? 0),
   };
 }
 

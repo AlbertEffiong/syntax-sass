@@ -1965,7 +1965,7 @@ function adminClasses() {
 
 function classModal(cls) {
   const editing = !!cls;
-  cls = cls || { name: "", teacher: "", subjects: [] };
+  cls = cls || { name: "", teacher: "", subjects: [], feeExpected: 0 };
   const teacherOptions = state.teachers.filter((x) => x.schoolId === state.school.id).map((x) => x.name);
   return openModal(`
     <div class="modal-head">
@@ -1987,6 +1987,11 @@ function classModal(cls) {
         <div class="field">
           <label>Subjects Taught in This Class</label>
           ${subjectFieldHTML((cls.subjects || []).join(", "))}
+        </div>
+        <div class="field">
+          <label for="cl-fee">Class Fee (NGN per term)</label>
+          <input class="input" id="cl-fee" name="fee" type="number" min="0" step="1000" value="${Number(cls.feeExpected || 0) || 0}" />
+          <span class="hint">Fixed termly fee for this class. When students are enrolled, this amount is applied automatically and cannot be edited per student.</span>
         </div>
       </div>
       <div class="modal-foot">
@@ -4068,6 +4073,10 @@ document.addEventListener("submit", async (e) => {
       return;
     }
     if (LIVE_API) {
+      const btn = form.querySelector("button[type='submit']");
+      const prevHtml = btn ? btn.innerHTML : "";
+      if (btn) { btn.disabled = true; btn.innerHTML = `${ic.clock}<span>Verifying…</span>`; }
+      showPageLoader("Verifying OTP…");
       try {
         const activated = await SyntaxApi.auth.verifyOtp({ email, otp: entered });
         const teacher = liveUpsertTeacher(activated.user);
@@ -4080,6 +4089,9 @@ document.addEventListener("submit", async (e) => {
         render();
       } catch (err) {
         toast("Verification failed", err.message || "Could not activate this teacher account.", "error");
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = prevHtml; }
+        hidePageLoader();
       }
       return;
     }
@@ -4375,9 +4387,11 @@ document.addEventListener("submit", async (e) => {
           String(item.schoolId) === String(state.school.id) &&
           (item.name.toLowerCase() === teacher.toLowerCase() || item.email.toLowerCase() === teacher.toLowerCase()),
         );
+        const fee = Number(data.get("fee") || 0) || 0;
         const saved = await SyntaxApi.admin.createClass({
           className: name,
           subjects,
+          feeExpected: fee,
           ...(teacherRecord ? { teacherEmail: teacherRecord.email } : {}),
         });
         const savedTeacher = state.teachers.find((x) => String(x.schoolId) === String(state.school.id) && String(x.email || "").toLowerCase() === String(saved.teacherEmail || "").toLowerCase());
@@ -4387,7 +4401,7 @@ document.addEventListener("submit", async (e) => {
           name: saved.className,
           teacher: (savedTeacher && savedTeacher.name) || saved.teacherEmail || teacher || "",
           subjects: saved.subjects || subjects,
-    students: Number(u.studentCount ?? u.students ?? 0),
+          feeExpected: Number(saved.feeExpected || 0),
         });
         closeModal();
         toast("Class created", `${name} added to this school's curriculum.`, "success");
@@ -4406,6 +4420,8 @@ document.addEventListener("submit", async (e) => {
           );
           const payload = { className: name, subjects };
           if (teacherRecord) payload.teacherEmail = teacherRecord.email;
+          const fee = Number(data.get("fee") || 0) || 0;
+          payload.feeExpected = fee;
           const saved = await SyntaxApi.admin.updateClass(id, payload);
           const c = state.classes.find((x) => x.id === id);
           const savedTeacher = state.teachers.find((x) => String(x.schoolId) === String(state.school.id) && String(x.email || "").toLowerCase() === String(saved.teacherEmail || "").toLowerCase());
@@ -4413,6 +4429,7 @@ document.addEventListener("submit", async (e) => {
             name: saved.className,
             teacher: (savedTeacher && savedTeacher.name) || saved.teacherEmail || teacher || "",
             subjects: saved.subjects || subjects,
+            feeExpected: Number(saved.feeExpected || 0),
           });
           toast("Class updated", `${name} and its subjects were saved.`, "success");
         } catch (err) {
@@ -4421,9 +4438,9 @@ document.addEventListener("submit", async (e) => {
         return;
       }
       const c = state.classes.find((x) => x.id === id);
-      if (c) { Object.assign(c, { name, teacher, subjects }); recordActivity("class.updated", "Class updated", `${name} curriculum was updated.`); toast("Class updated", `${name} and its subjects were saved.`); }
+      if (c) { Object.assign(c, { name, teacher, subjects, feeExpected: Number(data.get("fee") || 0) || 0 }); recordActivity("class.updated", "Class updated", `${name} curriculum was updated.`); toast("Class updated", `${name} and its subjects were saved.`); }
     } else {
-      state.classes.push({ id: "CLS" + Date.now().toString().slice(-6), schoolId: state.school.id, name, teacher, subjects, students: 0 });
+      state.classes.push({ id: "CLS" + Date.now().toString().slice(-6), schoolId: state.school.id, name, teacher, subjects, students: 0, feeExpected: Number(data.get("fee") || 0) || 0 });
       recordActivity("class.created", "Class created", `${name} added to the curriculum with ${subjects.length} subjects.`);
       toast("Class created", `${name} added to the curriculum with ${subjects.length} subjects.`, "success");
     }
@@ -4891,6 +4908,10 @@ async function liveLoadStudentResult(term) {
 
 async function liveLogin(role, form) {
   const data = new FormData(form);
+  const btn = form.querySelector("button[type='submit']");
+  const prevHtml = btn ? btn.innerHTML : "";
+  if (btn) { btn.disabled = true; btn.innerHTML = `${ic.clock}<span>Signing in…</span>`; }
+  showPageLoader("Signing in…");
   try {
     if (role === "student") {
       const res = await SyntaxApi.student.login({
@@ -4954,6 +4975,9 @@ async function liveLogin(role, form) {
     } else {
       toast("Sign-in failed", msg, "error");
     }
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = prevHtml; }
+    hidePageLoader();
   }
 }
 
