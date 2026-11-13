@@ -1404,7 +1404,7 @@ function studentModal(st) {
           </div>
           <div class="field">
             <label for="st-due">Amount Due</label>
-            <select class="select" id="st-due" name="due" data-action="student:dueSelect">
+            <select class="select" id="st-due" name="due" data-action="student:dueSelect" ${st.due === 0 ? "disabled" : ""}>
               <option value="0" ${st.due === 0 ? "selected" : ""}>Full fee cleared (0)</option>
               <option value="full" ${st.due > 0 && st.due >= expectedFee ? "selected" : ""}>Full fee — pay later (${money(expectedFee)})</option>
               <option value="75" ${st.due > 0 && st.due < expectedFee && Math.abs(st.due - expectedFee * 0.75) < 1 ? "selected" : ""}>75% — pay later (${money(Math.round(expectedFee * 0.75))})</option>
