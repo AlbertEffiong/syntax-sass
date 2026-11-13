@@ -4678,13 +4678,15 @@ function liveMapStatus(s) {
 
 function liveUpsertSchool(u) {
   const iso = u.subscriptionExpiresAt ? String(u.subscriptionExpiresAt).slice(0, 10) : "";
+  const existing = state.schools.find((s) => String(s.id) === String(u.id));
+  const incomingStudents = Number(u.studentCount ?? u.students ?? 0);
   const rec = {
     id: u.id,
     code: u.uniqueSchoolPrefix || "",
     name: u.name,
     tag: "",
     address: "—",
-    students: Number(u.studentCount ?? u.students ?? 0),
+    students: incomingStudents > 0 ? incomingStudents : (existing ? existing.students : 0),
     status: liveMapStatus(u.subscriptionStatus),
     renewal: iso,
     plan: u.planMonthly || 0,
@@ -4696,7 +4698,6 @@ function liveUpsertSchool(u) {
     uniqueSchoolPrefix: u.uniqueSchoolPrefix || "",
     academic: u.academic || null,
   };
-  const existing = state.schools.find((s) => String(s.id) === String(u.id));
   if (existing) Object.assign(existing, rec);
   else state.schools.push(rec);
   return state.schools.find((s) => String(s.id) === String(u.id));
