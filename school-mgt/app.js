@@ -1322,6 +1322,8 @@ function studentModal(st) {
     : CLASS_LEVELS.map((name) => ({ id: name, name }));
   if (editing && !studentClasses.some((item) => item.name === st.cls)) studentClasses.push({ id: st.cls, name: st.cls });
   st = st || { name: "", gender: "", dob: "", guardian: "", contact: "", address: "", cls: CLASS_LEVELS[0], due: 0 };
+  const selectedClass = state.classes.find((c) => c.id === st.cls || c.name === st.cls);
+  const expectedFee = Number(selectedClass && selectedClass.feeExpected) || 0;
   const err = (name) => `<span class="field-err" data-err="${name}"></span>`;
   openModal(`
     <div class="modal-head">
@@ -1388,19 +1390,28 @@ function studentModal(st) {
         </div>
         <div class="field">
           <label for="st-expected">Expected Fee (NGN)</label>
-          <input class="input" id="st-expected" name="expected" type="number" min="0" value="${st.feeExpected || st.due || 0}" />
+          <input class="input" id="st-expected" name="expected" type="number" min="0" value="${expectedFee}" readonly style="background:#f8fafc;color:var(--muted)" />
+          <span class="hint">This is the fixed fee set for the selected class. It cannot be edited per student.</span>
         </div>
         <div class="input-group">
           <div class="field">
             <label for="st-fee">Fee Status</label>
             <select class="select" id="st-fee" name="fee" data-action="student:feeToggle">
               <option value="paid" ${st.due === 0 ? "selected" : ""}>Fees Cleared</option>
-              <option value="owing" ${st.due > 0 ? "selected" : ""}>Owing</option>
+              <option value="owing" ${st.due > 0 ? "selected" : ""}>Fees Owing</option>
             </select>
           </div>
           <div class="field">
             <label for="st-due">Amount Due</label>
-            <input class="input" id="st-due" name="due" type="number" min="0" value="${st.due || 0}" ${st.due === 0 ? "disabled" : ""} />
+            <select class="select" id="st-due" name="due" data-action="student:dueSelect">
+              <option value="0" ${st.due === 0 ? "selected" : ""}>Full fee cleared (0)</option>
+              <option value="full" ${st.due > 0 && st.due >= expectedFee ? "selected" : ""}>Full fee — pay later (${money(expectedFee)})</option>
+              <option value="75" ${st.due > 0 && st.due < expectedFee && Math.abs(st.due - expectedFee * 0.75) < 1 ? "selected" : ""}>75% — pay later (${money(Math.round(expectedFee * 0.75))})</option>
+              <option value="50" ${st.due > 0 && st.due < expectedFee && Math.abs(st.due - expectedFee * 0.5) < 1 ? "selected" : ""}>50% — pay later (${money(Math.round(expectedFee * 0.5))})</option>
+              <option value="25" ${st.due > 0 && st.due < expectedFee && Math.abs(st.due - expectedFee * 0.25) < 1 ? "selected" : ""}>25% — pay later (${money(Math.round(expectedFee * 0.25))})</option>
+              <option value="custom" ${st.due > 0 && st.due !== expectedFee && Math.abs(st.due - expectedFee * 0.75) >= 1 && Math.abs(st.due - expectedFee * 0.5) >= 1 && Math.abs(st.due - expectedFee * 0.25) >= 1 ? "selected" : ""}>Custom amount…</option>
+            </select>
+            <input class="input" id="st-due-custom" name="dueCustom" type="number" min="0" max="${expectedFee}" value="${st.due > 0 && st.due !== expectedFee && Math.abs(st.due - expectedFee * 0.75) >= 1 && Math.abs(st.due - expectedFee * 0.5) >= 1 && Math.abs(st.due - expectedFee * 0.25) >= 1 ? st.due : 0}" placeholder="Custom amount (max ₦${money(expectedFee)})" style="margin-top:6px;display:none" />
           </div>
         </div>
         <div class="field">
@@ -3811,10 +3822,16 @@ document.addEventListener("change", (e) => {
   }
   if (action === "student:feeToggle") {
     const due = $("#st-due");
+    const custom = $("#st-due-custom");
     if (due) {
       due.disabled = el.value === "paid";
       if (el.value === "paid") due.value = 0;
     }
+    if (custom) custom.style.display = (el.value === "paid" || (due && due.value !== "custom")) ? "none" : "block";
+  }
+  if (action === "student:dueSelect") {
+    const custom = $("#st-due-custom");
+    if (custom) custom.style.display = (el.value === "custom") ? "block" : "none";
   }
   if (action === "toggle:debtors") {
     const previous = state.school.restrictDebtors;
@@ -4153,8 +4170,21 @@ document.addEventListener("submit", async (e) => {
     const cls = selectedClassRecord ? selectedClassRecord.name : selectedClass;
     const address = String(data.get("address") || "").trim();
     const password = String(data.get("password") || "").trim();
-    const owing = data.get("fee") === "owing";
-    const due = owing ? Math.max(0, Number(data.get("due")) || 0) : 0;
+    const feeStatus = String(data.get("fee") || "paid");
+    const owing = feeStatus === "owing";
+    const dueSelect = String(data.get("due") || "0");
+    const dueCustom = Number(data.get("dueCustom") || 0) || 0;
+    const classFee = selectedClassRecord ? Number(selectedClassRecord.feeExpected || 0) : 0;
+    let due = 0;
+    if (owing) {
+      if (dueSelect === "full") due = classFee;
+      else if (dueSelect === "75") due = Math.round(classFee * 0.75);
+      else if (dueSelect === "50") due = Math.round(classFee * 0.5);
+      else if (dueSelect === "25") due = Math.round(classFee * 0.25);
+      else if (dueSelect === "custom") due = Math.min(classFee, dueCustom);
+      else due = 0;
+    }
+    const feeExpected = classFee;
 
     clearFieldErrors(form);
     let valid = true;
@@ -4175,8 +4205,6 @@ document.addEventListener("submit", async (e) => {
     if (address.length < 4) fail("address", "Enter the residential address.");
     if ((!sid || password) && password.length < (LIVE_API ? 8 : 6)) fail("password", `Password must be at least ${LIVE_API ? 8 : 6} characters.`);
     if (!valid) { toast("Check the form", "Some fields need attention.", "error"); return; }
-
-    const feeExpected = Math.max(0, Number(data.get("expected")) || 0);
     if (due > feeExpected) {
       formFieldError(form, "due", "Amount due cannot exceed the expected fee.");
       toast("Check fee amounts", "Outstanding fees cannot exceed the expected fee.", "error");
