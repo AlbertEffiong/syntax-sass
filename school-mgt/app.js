@@ -713,12 +713,16 @@ function studentBlockedPanel(s) {
    1. SUPER ADMIN / SAAS OWNER
    ============================================================ */
 function superAdmin() {
-  const active = state.schools.filter((s) => s.status === "active" || s.status === "grace").length;
-  const expired = state.schools.filter((s) => s.status === "expired" || s.status === "locked").length;
-  const mrr = state.schools.filter((s) => s.status === "active").reduce((sum, s) => sum + s.plan, 0);
-  const totalStudents = state.schools.reduce((sum, s) => sum + s.students, 0);
+  const dash = (LIVE_API && state.ownerDashboard) ? state.ownerDashboard : null;
+  const active = dash ? dash.activeSchools : state.schools.filter((s) => s.status === "active" || s.status === "grace").length;
+  const expired = dash ? dash.expiredSchools : state.schools.filter((s) => s.status === "expired" || s.status === "locked").length;
+  const mrr = dash ? dash.mrr : state.schools.filter((s) => s.status === "active").reduce((sum, s) => sum + s.plan, 0);
+  const totalStudents = dash ? dash.totalStudents : state.schools.reduce((sum, s) => sum + s.students, 0);
+  const activeSubs = dash ? (dash.activeSubscriptions || active) : active;
   const pending = state.schools.filter((s) => s.pendingPayment);
 
+  const total = active + expired;
+  const mrrGrowth = total > 0 ? ((active - expired) / total * 100) : 0;
   const pendingRows = pending.map((s) => `
     <div class="list-row">
       <div style="display:flex;align-items:center;gap:12px;flex:1;flex-wrap:wrap">
@@ -786,7 +790,7 @@ function superAdmin() {
         <div class="stat-top"><div class="stat-icon blue">${ic.dollar}</div></div>
         <div class="stat-value">${money(mrr)}</div>
         <div class="stat-label">Monthly Recurring Revenue</div>
-        <div class="stat-delta up">${ic.trend} <span>8.4% growth</span></div>
+        <div class="stat-delta up">${ic.trend} <span>${mrrGrowth >= 0 ? "+" : ""}${mrrGrowth.toFixed(1)}% active vs expired</span></div>
       </div>
       <div class="card stat">
         <div class="stat-top"><div class="stat-icon red">${ic.alert}</div></div>
@@ -4674,6 +4678,10 @@ async function liveLoadOwnerSchools() {
   const items = (res && res.items) || [];
   state.schools = [];
   items.forEach((school) => liveUpsertSchool(school));
+  try {
+    const dash = await SyntaxApi.owner.dashboard();
+    state.ownerDashboard = dash;
+  } catch (e) { state.ownerDashboard = state.ownerDashboard || null; }
 }
 
 function liveUpsertTeacher(u) {
