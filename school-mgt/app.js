@@ -1958,6 +1958,7 @@ function adminClasses() {
           </div>
           <h3 style="font-size:17px">${esc(c.name)}</h3>
           <div class="cell-muted" style="margin:4px 0 12px">Form Teacher: ${esc(c.teacher || "—")}</div>
+          <div class="cell-muted" style="margin:0 0 12px;font-weight:700;color:var(--green)">Class Fee: ${money(Number(c.feeExpected || 0) || 0)} <span style="font-weight:400;color:var(--muted)">per term</span></div>
           <div class="field-label" style="margin-bottom:8px">Subjects taught in this class</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px">
             ${(c.subjects || []).map((sub) => `<span class="badge badge-info">${esc(sub)}</span>`).join("") || `<span class="cell-muted">No subjects assigned yet.</span>`}
