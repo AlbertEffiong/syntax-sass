@@ -1398,9 +1398,10 @@ function studentModal(st) {
           <div class="field">
             <label for="st-fee">Fee Status</label>
             <select class="select" id="st-fee" name="fee" data-action="student:feeToggle">
-              <option value="paid" ${st.due === 0 ? "selected" : ""}>Fees Cleared</option>
-              <option value="owing" ${st.due > 0 ? "selected" : ""}>Fees Owing</option>
+              <option value="paid" ${st.due === 0 ? "selected" : ""} ${st.due > 0 ? "disabled" : ""}>Fees Cleared</option>
+              <option value="owing" ${st.due > 0 ? "selected" : ""} ${st.due === 0 ? "disabled" : ""}>Fees Owing</option>
             </select>
+            <span class="hint">${st.due > 0 ? "To clear fees, use Record Payment on the student row." : "Once cleared, fees cannot be set to owing here."}</span>
           </div>
           <div class="field">
             <label for="st-due">Amount Due</label>
