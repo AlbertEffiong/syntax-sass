@@ -4807,6 +4807,7 @@ async function liveLoadAdminData() {
       subjects: item.subjects || [],
       teacher: (t && t.name) || item.teacherEmail || "",
       students: 0,
+      feeExpected: Number(item.feeExpected || 0) || 0,
     };
   });
 
@@ -4875,6 +4876,7 @@ async function liveLoadTeacherData() {
       subjects: item.subjects || [],
       teacher: (t && t.name) || item.teacherEmail || "",
       students: 0,
+      feeExpected: Number(item.feeExpected || 0) || 0,
     };
   });
   const firstClass = state.classes[0];
