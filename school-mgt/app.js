@@ -1316,7 +1316,8 @@ function studentModal(st) {
   const editing = !!st;
   const prefix = schoolPrefix(state.school);
   const gen = editing ? null : nextStudentId(state.school.id);
-  const autoPass = editing ? (st.password || "") : genPassword(prefix);
+  const autoPass = editing ? "" : genPassword(prefix);
+  const hasExistingPassword = editing && !!(st.password);
   const studentClasses = LIVE_API
     ? state.classes.filter((item) => String(item.schoolId) === String(state.school.id)).map((item) => ({ id: item.id, name: item.name }))
     : CLASS_LEVELS.map((name) => ({ id: name, name }));
@@ -1417,11 +1418,11 @@ function studentModal(st) {
         <div class="field">
           <label for="st-pass">Portal Password</label>
           <div class="input-inline">
-            <input class="input code" id="st-pass" name="password" value="${esc(autoPass)}" />
+            <input class="input code" id="st-pass" name="password" value="${editing ? (hasExistingPassword ? "••••••••" : "") : esc(autoPass)}" placeholder="${editing ? "leave blank to keep current" : ""}" />
             <button type="button" class="btn btn-soft btn-sm" data-action="student:genPass" data-target="st-pass" data-prefix="${esc(prefix)}">${ic.refresh}<span>Generate</span></button>
           </div>
           ${err("password")}
-          <span class="hint">Used with the Student ID to sign in to the Student/Parent portal.</span>
+          <span class="hint">${editing ? "Password is not shown for security. Leave blank to keep the current password, or type a new one (min 8 chars)." : "Used with the Student ID to sign in to the Student/Parent portal."}</span>
         </div>
       </div>
       <div class="modal-foot">
@@ -4169,7 +4170,8 @@ document.addEventListener("submit", async (e) => {
       : null;
     const cls = selectedClassRecord ? selectedClassRecord.name : selectedClass;
     const address = String(data.get("address") || "").trim();
-    const password = String(data.get("password") || "").trim();
+    let password = String(data.get("password") || "").trim();
+    if (sid && password === "••••••••") password = "";
     const feeStatus = String(data.get("fee") || "paid");
     const owing = feeStatus === "owing";
     const dueSelect = String(data.get("due") || "0");
