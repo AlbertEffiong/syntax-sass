@@ -16,6 +16,7 @@ import {
   RecordFeePaymentBody,
   DebtorControlBody,
   UpdateClassBody,
+  ChangeTeacherPasswordBody,
 } from '../validators/admin.validators';
 import { AssessmentStatus } from '../models/Assessment';
 
@@ -131,6 +132,16 @@ export const removeTeacher = asyncHandler(async (req: Request, res: Response) =>
 export const resendTeacherOtp = asyncHandler(async (req: Request, res: Response) => {
   const result = await authService.resendTeacherOtp(requireTenant(req), req.params.id);
   return ok(res, result, 'A new verification code has been sent.');
+});
+
+/**
+ * PATCH /api/admin/teachers/:id/password
+ * Changes a verified teacher's sign-in password (requires current password).
+ */
+export const changeTeacherPassword = asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as ChangeTeacherPasswordBody;
+  await adminService.changeTeacherPassword(requireTenant(req), req.params.id, body);
+  return ok(res, null, 'Teacher password updated.');
 });
 
 export const getAssessmentDetails = asyncHandler(async (req: Request, res: Response) => {

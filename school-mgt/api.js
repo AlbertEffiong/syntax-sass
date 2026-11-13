@@ -300,6 +300,9 @@
     resendTeacherOtp: function (id) {
       return post('/api/admin/teachers/' + encodeURIComponent(id) + '/resend-otp');
     },
+    changeTeacherPassword: function (id, payload) {
+      return patch('/api/admin/teachers/' + encodeURIComponent(id) + '/password', payload);
+    },
     listAssessments: function (params) {
       return get('/api/admin/pending-assessments' + buildQuery(params));
     },

@@ -6,6 +6,7 @@ import { validate } from '../middleware/validate';
 import {
   academicSettingSchema,
   adminBankTransferSchema,
+  changeTeacherPasswordSchema,
   createClassSchema,
   enrollStudentSchema,
   idParamsSchema,
@@ -53,6 +54,12 @@ router.patch(
 );
 router.delete('/teachers/:id', validate(idParamsSchema, 'params'), adminController.removeTeacher);
 router.post('/teachers/:id/resend-otp', validate(idParamsSchema, 'params'), adminController.resendTeacherOtp);
+router.patch(
+  '/teachers/:id/password',
+  validate(idParamsSchema, 'params'),
+  validate(changeTeacherPasswordSchema),
+  adminController.changeTeacherPassword,
+);
 
 // --- Assessment approval workflow ---
 router.get(

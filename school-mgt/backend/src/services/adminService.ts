@@ -433,6 +433,34 @@ export async function updateTeacher(
 }
 
 /**
+ * Changes a verified teacher's sign-in password. Requires the current password
+ * so an admin cannot silently overwrite it without knowing it.
+ */
+export async function changeTeacherPassword(
+  schoolId: string,
+  teacherId: string,
+  patch: { currentPassword: string; newPassword: string },
+): Promise<void> {
+  const teacher = await Teacher.findById(teacherId).select('+password');
+  if (!teacher) {
+    throw ApiError.notFound('Teacher not found.', 'TEACHER_NOT_FOUND');
+  }
+  assertSameSchool(teacher.schoolId, schoolId);
+
+  if (!teacher.password) {
+    throw ApiError.badRequest('This teacher has not activated their account yet.', 'TEACHER_NOT_ACTIVATED');
+  }
+  const ok = await verifyPassword(patch.currentPassword, teacher.password);
+  if (!ok) {
+    throw ApiError.unauthorized('Current password is incorrect.', 'INVALID_PASSWORD');
+  }
+  teacher.password = await hashPassword(patch.newPassword);
+  await teacher.save();
+  await cache.invalidatePrefix(`teachers:${schoolId}:`);
+  await recordSchoolActivity(schoolId, 'teacher.updated', 'Teacher password changed', `${teacher.name}'s sign-in password was updated.`);
+}
+
+/**
  * Removes a teacher from the tenant. Tenant-scoped (IDOR safe).
  */
 export async function removeTeacher(schoolId: string, teacherId: string): Promise<void> {

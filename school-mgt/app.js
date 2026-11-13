@@ -1583,6 +1583,7 @@ function adminTeachers() {
           ${t.verified
             ? `<button class="icon-btn" data-action="teacher:edit" data-id="${t.id}" title="Edit teacher">${ic.edit}</button>`
             : `<button class="btn btn-soft btn-sm" data-action="teacher:resendOtp" data-id="${t.id}" title="Resend verification OTP">${ic.refresh}<span>Resend OTP</span></button>`}
+          ${t.verified ? `<button class="icon-btn" data-action="teacher:changePassword" data-id="${t.id}" title="Change sign-in password">${ic.key}</button>` : ""}
           <button class="icon-btn danger" data-action="teacher:delete" data-id="${t.id}" title="Delete teacher">${ic.trash}</button>
         </div>
       </td>
@@ -1782,6 +1783,40 @@ function teacherModal(t) {
       <div class="modal-foot">
         <button type="button" class="btn btn-ghost" data-action="modal:close">Cancel</button>
         <button type="submit" class="btn btn-primary">${ic.check}<span>${editing ? "Save Changes" : "Add Teacher"}</span></button>
+      </div>
+    </form>
+  `);
+}
+
+function changeTeacherPasswordModal(t) {
+  if (!t) return;
+  openModal(`
+    <div class="modal-head">
+      <div><h3>Change Teacher Password</h3><div class="sub">${esc(t.name)} · ${esc(t.email)}</div></div>
+      <button class="close-x" data-action="modal:close">${ic.x}</button>
+    </div>
+    <form data-action="form:changeTeacherPassword" data-id="${esc(t.id)}">
+      <div class="modal-body">
+        <div class="field">
+          <label for="tcp-current">Current Password</label>
+          <input class="input" id="tcp-current" name="currentPassword" type="password" placeholder="••••••••" required autocomplete="current-password" />
+        </div>
+        <div class="input-group">
+          <div class="field">
+            <label for="tcp-new">New Password</label>
+            <input class="input code" id="tcp-new" name="newPassword" type="password" placeholder="Min 8 chars" required autocomplete="new-password" />
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+            <button type="button" class="btn btn-soft btn-sm" data-action="teacher:genPass" data-target="tcp-new" data-prefix="Teacher">${ic.refresh}<span>Generate</span></button>
+          </div>
+        </div>
+        <span class="field-err" data-err="newPassword"></span>
+        <span class="hint">The teacher uses this with their email to sign in. Minimum 8 characters. Leave the current-password field blank to keep the existing password.</span>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" data-action="modal:close">Cancel</button>
+        <button type="submit" class="btn btn-primary">${ic.key}<span>Update Password</span></button>
       </div>
     </form>
   `);
@@ -3170,10 +3205,17 @@ document.addEventListener("click", async (e) => {
       if (st) resetPasswordModal(st);
       break;
     }
-    case "student:genPass": {
+case "student:genPass": {
       const target = btn.getAttribute("data-target");
       const pfx = btn.getAttribute("data-prefix") || schoolPrefix(state.school);
-      const input = target ? $("#" + target) : null;
+      const input = target ? $("#"+target) : null;
+      if (input) input.value = genPassword(pfx);
+      break;
+    }
+    case "teacher:genPass": {
+      const target = btn.getAttribute("data-target");
+      const pfx = btn.getAttribute("data-prefix") || "Teacher";
+      const input = target ? $("#"+target) : null;
       if (input) input.value = genPassword(pfx);
       break;
     }
@@ -3216,6 +3258,11 @@ document.addEventListener("click", async (e) => {
     case "teacher:edit": {
       const t = state.teachers.find((x) => x.id === rawId);
       if (t) teacherModal(t);
+      break;
+    }
+    case "teacher:changePassword": {
+      const t = state.teachers.find((x) => x.id === rawId);
+      if (t) changeTeacherPasswordModal(t);
       break;
     }
     case "teacher:delete": {
@@ -4352,6 +4399,36 @@ document.addEventListener("submit", async (e) => {
     render();
   }
 
+  if (action === "form:changeTeacherPassword") {
+    const data = new FormData(form);
+    const t = state.teachers.find((x) => x.id === form.getAttribute("data-id"));
+    if (!t) { closeModal(); return; }
+    const currentPassword = String(data.get("currentPassword") || "").trim();
+    const newPassword = String(data.get("newPassword") || "").trim();
+    clearFieldErrors(form);
+    if (newPassword.length < 8) {
+      formFieldError(form, "newPassword", "Password must be at least 8 characters.");
+      toast("Password too short", "Use at least 8 characters.", "error");
+      return;
+    }
+    if (LIVE_API) {
+      try {
+        if (!t.dbId) throw new Error("This teacher record is not linked to the backend.");
+        await SyntaxApi.admin.changeTeacherPassword(t.dbId, { currentPassword, newPassword });
+        closeModal();
+        toast("Password updated", `${t.name} can sign in with the new password.`);
+        render();
+      } catch (err) {
+        toast("Password change failed", err.message || "Could not update this password.", "error");
+      }
+      return;
+    }
+    t.password = newPassword;
+    closeModal();
+    toast("Password updated", `${t.name} can sign in with the new password.`);
+    render();
+  }
+
   if (action === "form:saveTraits") {
     const data = new FormData(form);
     const studentId = form.getAttribute("data-student-id");
@@ -4721,6 +4798,7 @@ function liveUpsertTeacher(u) {
   const subjects = String(u.subject || "").split(",").map((s) => s.trim()).filter(Boolean);
   const rec = {
     id: u.id,
+    dbId: u.id,
     schoolId: u.schoolId,
     name: u.name,
     subject: subjects.join(", "),

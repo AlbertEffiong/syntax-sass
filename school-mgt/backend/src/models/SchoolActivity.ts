@@ -9,6 +9,7 @@ export type SchoolActivityType =
   | 'teacher.verified'
   | 'teacher.updated'
   | 'teacher.removed'
+  | 'teacher.password_changed'
   | 'class.created'
   | 'class.updated'
   | 'class.removed'

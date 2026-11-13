@@ -101,6 +101,20 @@ export const updateTeacherSchema = z
   });
 
 /**
+ * Changes a verified teacher's sign-in password. Requires the current password
+ * so an admin cannot silently overwrite it without knowing it.
+ */
+export const changeTeacherPasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Current password is required.'),
+    newPassword: passwordSchema,
+  })
+  .refine((v) => v.currentPassword !== v.newPassword, {
+    message: 'New password must be different from the current password.',
+    path: ['newPassword'],
+  });
+
+/**
  * Updates an existing class's name, subjects and/or form teacher. At least one
  * field must be provided.
  */
@@ -132,3 +146,4 @@ export type AdminBankTransferBody = z.infer<typeof adminBankTransferSchema>;
 export type UpdateClassBody = z.infer<typeof updateClassSchema>;
 export type UpdateTeacherBody = z.infer<typeof updateTeacherSchema>;
 export type AcademicSettingBody = z.infer<typeof academicSettingSchema>;
+export type ChangeTeacherPasswordBody = z.infer<typeof changeTeacherPasswordSchema>;
