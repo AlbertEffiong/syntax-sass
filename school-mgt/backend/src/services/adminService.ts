@@ -702,7 +702,12 @@ export async function getPendingPaymentReceipt(schoolId: string) {
 
 export async function updateSchoolSettings(
   schoolId: string,
-  patch: { principalName?: string; currentPassword?: string; newPassword?: string; principalSignature?: { fileName: string; contentType: string; contentBase64: string } },
+  patch: {
+    principalName?: string;
+    currentPassword?: string;
+    newPassword?: string;
+    principalSignature?: { fileName: string; contentType: string; url?: string; contentBase64?: string };
+  },
 ): Promise<SchoolPublic> {
   const school = await School.findById(schoolId).select('+password');
   if (!school) throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');
@@ -711,7 +716,8 @@ export async function updateSchoolSettings(
     school.principalSignature = {
       fileName: patch.principalSignature.fileName.trim(),
       contentType: patch.principalSignature.contentType.trim(),
-      contentBase64: patch.principalSignature.contentBase64,
+      ...(patch.principalSignature.url ? { url: patch.principalSignature.url } : {}),
+      ...(patch.principalSignature.contentBase64 ? { contentBase64: patch.principalSignature.contentBase64 } : {}),
     };
   }
   if (patch.newPassword) {

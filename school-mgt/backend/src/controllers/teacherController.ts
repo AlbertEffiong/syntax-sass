@@ -4,6 +4,7 @@ import { ok } from '../utils/response';
 import { ApiError } from '../utils/ApiError';
 import { serializeTeacher } from '../utils/serialize';
 import * as teacherService from '../services/teacherService';
+import * as uploadService from '../services/uploadService';
 import { SaveBroadsheetBody, SubmitBroadsheetBody } from '../validators/teacher.validators';
 
 /**
@@ -89,18 +90,20 @@ export const notifyAdminSetup = asyncHandler(async (req: Request, res: Response)
 
 /**
  * PATCH /api/teacher/me/signature
- * The authenticated teacher uploads their own signature (base64 data URL),
- * which is shown on printed results.
+ * The authenticated teacher uploads their own signature (multipart file),
+ * which is rendered on printed results. Falls back to base64-in-document
+ * storage when no object storage is configured.
  */
 export const updateMySignature = asyncHandler(async (req: Request, res: Response) => {
-  const body = req.body as { signature?: { fileName: string; contentType: string; contentBase64: string } };
-  if (!body?.signature?.contentBase64) {
+  const file = (req as Request & { file?: Express.Multer.File }).file;
+  if (!file) {
     throw ApiError.badRequest('A signature image is required.', 'SIGNATURE_REQUIRED');
   }
+  const stored = await uploadService.storeUpload(file);
   const teacher = await teacherService.updateTeacherSignature(
     requireTenant(req),
     requireTeacherId(req),
-    body.signature,
+    stored,
   );
   return ok(res, serializeTeacher(teacher), 'Signature saved.');
 });

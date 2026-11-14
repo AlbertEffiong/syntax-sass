@@ -5,6 +5,7 @@ import { ApiError } from '../utils/ApiError';
 import { resolvePagination } from '../utils/pagination';
 import * as adminService from '../services/adminService';
 import * as authService from '../services/authService';
+import * as uploadService from '../services/uploadService';
 import {
   CreateClassBody,
   EnrollStudentBody,
@@ -233,6 +234,24 @@ export const getPendingPaymentReceipt = asyncHandler(async (req: Request, res: R
 export const updateSchoolSettings = asyncHandler(async (req: Request, res: Response) => {
   const school = await adminService.updateSchoolSettings(requireTenant(req), req.body);
   return ok(res, school, 'School profile updated.');
+});
+
+/**
+ * PATCH /api/admin/school/signature
+ * Multipart upload of the principal's signature. When object storage is
+ * configured the file is pushed to the bucket and a public URL is stored;
+ * otherwise the base64 payload is stored in the document.
+ */
+export const updatePrincipalSignature = asyncHandler(async (req: Request, res: Response) => {
+  const file = (req as Request & { file?: Express.Multer.File }).file;
+  if (!file) {
+    throw ApiError.badRequest('A signature image is required.', 'SIGNATURE_REQUIRED');
+  }
+  const stored = await uploadService.storeUpload(file);
+  const school = await adminService.updateSchoolSettings(requireTenant(req), {
+    principalSignature: stored,
+  });
+  return ok(res, school, 'Principal signature saved.');
 });
 
 /**

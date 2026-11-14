@@ -69,6 +69,20 @@ export const env = {
     accountNumber: read('OPAY_ACCOUNT_NUMBER', '8168998060'),
     accountName: read('OPAY_ACCOUNT_NAME', 'Albert Effiong'),
   },
+
+  /**
+   * Object storage (Supabase S3-compatible or AWS S3). Used for uploaded
+   * signatures and payment receipts. When any of these are unset, uploads
+   * fall back to base64-in-document storage.
+   */
+  s3: {
+    endpoint: process.env.S3_ENDPOINT || undefined,
+    region: process.env.S3_REGION || undefined,
+    bucket: process.env.S3_BUCKET || undefined,
+    accessKeyId: process.env.S3_ACCESS_KEY || undefined,
+    secretAccessKey: process.env.S3_SECRET_KEY || undefined,
+    publicUrl: process.env.S3_PUBLIC_URL || undefined,
+  },
 } as const;
 
 export type Env = typeof env;

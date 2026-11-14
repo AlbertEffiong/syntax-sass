@@ -34,8 +34,13 @@ export interface SchoolPublic {
     status: string;
     receipt?: { fileName: string; contentType: string };
   };
-  /** Principal's signature (base64 data URL) shown on printed results. */
-  principalSignature?: { fileName: string; contentType: string; contentBase64: string };
+  /** Principal's signature. When S3 is configured this is a public URL; otherwise a base64 data URL. */
+  principalSignature?: {
+    fileName: string;
+    contentType: string;
+    url?: string;
+    contentBase64?: string;
+  };
   createdAt: Date;
 }
 
@@ -72,7 +77,8 @@ export function serializeSchool(school: ISchoolDocument): SchoolPublic {
       principalSignature: {
         fileName: school.principalSignature.fileName,
         contentType: school.principalSignature.contentType,
-        contentBase64: school.principalSignature.contentBase64,
+        ...(school.principalSignature.url ? { url: school.principalSignature.url } : {}),
+        ...(school.principalSignature.contentBase64 ? { contentBase64: school.principalSignature.contentBase64 } : {}),
       },
     } : {}),
     createdAt: school.createdAt,
@@ -88,8 +94,13 @@ export interface TeacherPublic {
   classesTaught: number;
   status: 'Active' | 'On Leave';
   verified: boolean;
-  /** Teacher's signature (base64 data URL) shown on printed results. */
-  signature?: { fileName: string; contentType: string; contentBase64: string };
+  /** Teacher's signature. When S3 is configured this is a public URL; otherwise a base64 data URL. */
+  signature?: {
+    fileName: string;
+    contentType: string;
+    url?: string;
+    contentBase64?: string;
+  };
 }
 
 export function serializeTeacher(teacher: ITeacherDocument): TeacherPublic {

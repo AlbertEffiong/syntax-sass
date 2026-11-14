@@ -13,6 +13,8 @@ export const enrollStudentSchema = z.object({
   fullName: z.string().min(2, 'Student full name is required.').trim(),
   gender: z.enum(['Male', 'Female']),
   dob: z.coerce.date(),
+  /** Optional explicit age (years) entered at enrollment; shown on the report card. */
+  age: z.number().int().min(0).max(18).optional(),
   currentClass: z.string().min(1, 'Current class is required.').trim(),
   classId: objectIdSchema.optional(),
   password: passwordSchema,
@@ -31,6 +33,8 @@ export const updateStudentSchema = z.object({
   fullName: z.string().min(2).trim().optional(),
   gender: z.enum(['Male', 'Female']).optional(),
   dob: z.coerce.date().optional(),
+  /** Optional explicit age (years); shown on the report card. */
+  age: z.number().int().min(0).max(18).optional(),
   currentClass: z.string().min(1).trim().optional(),
   guardian: z.string().trim().optional(),
   contact: z.string().trim().optional(),

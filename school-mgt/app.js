@@ -260,12 +260,14 @@ function findStudentByLogin(input) {
 }
 function openConfirmModal(opts) {
   return new Promise((resolve) => {
-    const close = () => resolve(false);
-    const ok = () => resolve(true);
-    const existing = document.querySelector(".modal-backdrop");
+    let settled = false;
+    const finish = (v) => { if (settled) return; settled = true; resolve(v); try { wrap.remove(); } catch (e) {} };
+    const close = () => finish(false);
+    const ok = () => finish(true);
+    const existing = document.querySelector(".modal-backdrop.confirm-modal");
     if (existing) existing.remove();
     const wrap = document.createElement("div");
-    wrap.className = "modal-backdrop";
+    wrap.className = "modal-backdrop confirm-modal";
     wrap.innerHTML = `
       <div class="modal" role="dialog" aria-modal="true" aria-title="${esc(opts.title || "Confirm")}" style="max-width:460px">
         <div class="modal-head">
@@ -4961,6 +4963,7 @@ function liveUpsertSchool(u) {
     restrictDebtors: !!u.restrictDebtors,
     uniqueSchoolPrefix: u.uniqueSchoolPrefix || "",
     academic: u.academic || null,
+    principalSignature: u.principalSignature || (existing ? existing.principalSignature : null),
   };
   if (existing) Object.assign(existing, rec);
   else state.schools.push(rec);

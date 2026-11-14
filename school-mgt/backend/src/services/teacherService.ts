@@ -4,6 +4,7 @@ import { School } from '../models/School';
 import { Student } from '../models/Student';
 import { Teacher, ITeacherDocument } from '../models/Teacher';
 import { Assessment } from '../models/Assessment';
+import type { UploadedFile } from './uploadService';
 import { ApiError } from '../utils/ApiError';
 import { computeTotal, gradeFor } from '../utils/grading';
 import { serializeClass, ClassPublic, serializeAssessment, AssessmentPublic, serializeSchool } from '../utils/serialize';
@@ -283,13 +284,14 @@ export async function notifyAdminSetup(schoolId: string, teacherId: string): Pro
 }
 
 /**
- * Stores the authenticated teacher's own signature (base64 data URL) so it can
- * be rendered on printed results.
+ * Stores the authenticated teacher's own signature. When object storage is
+ * configured the file is uploaded and a public URL is stored; otherwise the
+ * base64 payload is stored in the document.
  */
 export async function updateTeacherSignature(
   schoolId: string,
   teacherId: string,
-  signature: { fileName: string; contentType: string; contentBase64: string },
+  signature: UploadedFile,
 ): Promise<ITeacherDocument> {
   const teacher = await Teacher.findById(teacherId);
   if (!teacher) throw ApiError.notFound('Teacher not found.', 'TEACHER_NOT_FOUND');
@@ -299,7 +301,8 @@ export async function updateTeacherSignature(
   teacher.signature = {
     fileName: signature.fileName.trim(),
     contentType: signature.contentType.trim(),
-    contentBase64: signature.contentBase64,
+    ...(signature.url ? { url: signature.url } : {}),
+    ...(signature.contentBase64 ? { contentBase64: signature.contentBase64 } : {}),
   };
   await teacher.save();
   return teacher;

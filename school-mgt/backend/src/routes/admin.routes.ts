@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { signatureUpload } from '../middleware/upload';
 import * as adminController from '../controllers/adminController';
 import { authenticate, authorize } from '../middleware/auth';
 import { enforceTenant } from '../middleware/tenant';
@@ -29,6 +30,7 @@ router.use(authenticate, authorize('admin'), enforceTenant);
 // --- School profile & academic calendar ---
 router.get('/school', adminController.getSchoolSettings);
 router.patch('/school', validate(updateSchoolSettingsSchema), adminController.updateSchoolSettings);
+router.patch('/school/signature', signatureUpload, adminController.updatePrincipalSignature);
 router.get('/dashboard', adminController.getDashboard);
 router.patch('/debtor-control', validate(debtorControlSchema), adminController.updateDebtorControl);
 router.patch('/academic-setting', validate(academicSettingSchema), adminController.updateAcademicSetting);

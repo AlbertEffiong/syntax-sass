@@ -36,6 +36,8 @@ export interface IStudent {
   fullName: string;
   gender: Gender;
   dob: Date;
+  /** Optional explicit age (years) entered at enrollment; shown on the report card. */
+  age?: number;
   currentClass: string;
   guardian: string;
   contact: string;
@@ -91,6 +93,8 @@ const studentSchema = new Schema<IStudentDocument>(
     fullName: { type: String, required: [true, 'Student name is required'], trim: true },
     gender: { type: String, enum: ['Male', 'Female'], required: true },
     dob: { type: Date, required: true },
+    /** Optional explicit age (years) entered at enrollment; shown on the report card. */
+    age: { type: Number, min: 0, max: 18, default: undefined },
     currentClass: { type: String, required: true, trim: true },
   guardian: { type: String, trim: true, default: '' },
   contact: { type: String, trim: true, default: '' },
