@@ -38,6 +38,10 @@ export interface ReportCard {
   average: number;
   position: number;
   classSize: number;
+  /** Teacher-entered attendance for this student this term, e.g. "18/20". */
+  attendance: string;
+  /** Teacher-entered general remark for this student this term. */
+  remark: string;
   principalName: string;
   classTeacherName: string;
   affective: { trait: string; rating: string }[];
@@ -124,6 +128,10 @@ export async function getResults(input: GetResultsInput): Promise<ReportCard> {
 
   const principalName = school?.principalName || assessments[0]?.principalName || '';
   const classTeacherNames = subjects.map((s) => s.teacherName).filter(Boolean);
+  // Attendance + remark are teacher-entered per student per term; pick the
+  // first non-empty value across the subject rows.
+  const attendance = assessments.find((a) => (a.attendance || '').trim())?.attendance || '';
+  const remark = assessments.find((a) => (a.remark || '').trim())?.remark || '';
 
   return {
     schoolId: input.schoolId,
@@ -144,6 +152,8 @@ export async function getResults(input: GetResultsInput): Promise<ReportCard> {
     average,
     position,
     classSize,
+    attendance,
+    remark,
     principalName,
     classTeacherName: classTeacherNames[0] ?? '',
     affective,
@@ -254,6 +264,8 @@ function buildFromHistory(
     average: history.average,
     position: history.position,
     classSize: history.classSize,
+    attendance: history.attendance || '',
+    remark: history.remark || '',
     principalName: history.principalName || principalNameFromSchool,
     classTeacherName: history.classTeacherName,
     affective,

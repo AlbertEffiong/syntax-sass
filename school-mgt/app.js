@@ -260,7 +260,7 @@ function findStudentByLogin(input) {
 }
 function ageFromDob(dob) {
   if (!dob) return "—";
-  const d = new Date(dob + "T00:00:00");
+  const d = new Date(dob);
   if (isNaN(d)) return "—";
   const t = new Date();
   let age = t.getFullYear() - d.getFullYear();
@@ -268,6 +268,58 @@ function ageFromDob(dob) {
   if (m < 0 || (m === 0 && t.getDate() < d.getDate())) age--;
   return age;
 }
+
+/**
+ * Reads a chosen <input type=file> as a base64 data URL and returns a
+ * signature payload ready for the API. Rejects non-image files.
+ */
+function readSignatureFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) return reject(new Error("No file selected."));
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      return reject(new Error("Use a JPG, PNG or WebP image."));
+    }
+    if (file.size > 900_000) return reject(new Error("Signature image must be under 900 KB."));
+    const reader = new FileReader();
+    reader.onload = () => resolve({
+      fileName: file.name,
+      contentType: file.type,
+      contentBase64: String(reader.result || "").split(",")[1] || "",
+    });
+    reader.onerror = () => reject(new Error("Could not read the file."));
+    reader.readAsDataURL(file);
+  });
+}
+function parseAttendance(att) {
+  if (!att) return { present: 0, total: 0 };
+  if (typeof att === "object" && "present" in att) return { present: Number(att.present) || 0, total: Number(att.total) || 0 };
+  const m = String(att).match(/(\d+)\s*\/\s*(\d+)/);
+  if (m) return { present: Number(m[1]) || 0, total: Number(m[2]) || 0 };
+  const n = Number(att);
+  return isNaN(n) ? { present: 0, total: 0 } : { present: n, total: 0 };
+}
+
+function teacherSignatureFor(cls, schoolId) {
+  const sid = schoolId || (state.school ? state.school.id : null);
+  const list = state.assessments.filter((x) => (sid === null || x.schoolId === sid) && normClass(x.cls) === normClass(cls) && x.teacher);
+  if (list.length) {
+    const t = state.teachers.find((x) => String(x.email || "").toLowerCase() === String(list[list.length - 1].teacherEmail || "").toLowerCase());
+    if (t && t.signature) return t.signature;
+  }
+  const rec = state.classes.find((c) => normClass(c.name) === normClass(cls) && (!c.schoolId || c.schoolId === sid) && c.teacher);
+  if (rec) {
+    const t = state.teachers.find((x) => String(x.name || "").toLowerCase() === String(rec.teacher || "").toLowerCase());
+    if (t && t.signature) return t.signature;
+  }
+  return null;
+}
+
+function principalSignatureFor(s) {
+  if (!s) return null;
+  return s.principalSignature || null;
+}
+
 function ordinal(n) {
   const s = ["th", "st", "nd", "rd"], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
@@ -2200,6 +2252,22 @@ function adminProfile() {
           </div>
         </form>
       </div>
+      <div class="card">
+        <h3 style="margin-bottom:14px">Principal Signature</h3>
+        <span class="hint">Uploaded signatures are rendered on every printed report card under the Principal line. Use a JPG, PNG or WebP image.</span>
+        ${s.principalSignature ? `
+          <div class="sig-preview" style="margin:12px 0">
+            <img src="${esc(s.principalSignature.contentBase64)}" alt="Principal signature" style="max-height:90px;max-width:220px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:6px" />
+            <div class="cell-muted" style="font-size:12px;margin-top:6px">${esc(s.principalSignature.fileName || "signature")}</div>
+          </div>
+        ` : `<div class="cell-muted" style="margin:12px 0;padding:14px;border:1px dashed var(--line);border-radius:8px;text-align:center">No signature uploaded yet.</div>`}
+        <label class="upload-zone" for="pr-sig-file">${ic.upload}<span><strong>Click to attach</strong> or drop a signature image</span></label>
+        <input class="input" id="pr-sig-file" name="principalSignature" type="file" accept="image/jpeg,image/png,image/webp" hidden data-action="admin:signatureUpload" />
+        <div class="modal-foot" style="padding:0;margin-top:14px">
+          <button type="button" class="btn btn-ghost" data-action="modal:close">Cancel</button>
+          <button type="button" class="btn btn-primary" data-action="admin:signatureUpload" data-target="pr-sig-file">${ic.check}<span>Upload Signature</span></button>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -2367,13 +2435,13 @@ function todayISO() { return new Date().toISOString().slice(0, 10); }
 function rosterFor(cls) {
   const sid = state.school ? state.school.id : (state.auth && state.auth.admin ? state.auth.admin.schoolId : null);
   const enrolled = (state.students || []).filter((st) => st.schoolId === sid && normClass(st.cls) === normClass(cls));
-  if (enrolled.length) return enrolled.map((st) => ({ name: st.name, ca1: "", ca2: "", exam: "" }));
+  if (enrolled.length) return enrolled.map((st) => ({ name: st.name, studentId: st.id, dbId: st.dbId, ca1: "", ca2: "", exam: "", attendance: "", remark: "" }));
   const first = ["Chinedu", "Aisha", "Tunde", "Ngozi", "Emeka", "Fatima", "Bola", "Kelechi", "Zainab", "Samuel"];
   const last = ["Okeke", "Bello", "Adeyemi", "Eze", "Obi", "Yusuf", "Ogunleye", "Nwankwo", "Musa", "Johnson"];
   const seed = cls.charCodeAt(0) + cls.charCodeAt(cls.length - 1);
   const out = [];
   for (let i = 0; i < 10; i++) {
-    out.push({ name: `${first[(i + seed) % 10]} ${last[(i * 3 + seed) % 10]}`, ca1: "", ca2: "", exam: "" });
+    out.push({ name: `${first[(i + seed) % 10]} ${last[(i * 3 + seed) % 10]}`, studentId: "", dbId: "", ca1: "", ca2: "", exam: "", attendance: "", remark: "" });
   }
   return out;
 }
@@ -2442,10 +2510,18 @@ const classOptions = schoolClassOptions();
           <label for="t-principal">Principal Name</label>
           <input class="input" id="t-principal" data-action="principal:set" value="${esc(principalName(state.school || {}))}" placeholder="e.g. A. Bello" autocomplete="off" />
           <span class="hint">Attached to reports &amp; approval sheets</span>
+        </div>
+        <div class="field">
+          <label for="t-sig-file">Your Signature</label>
+          <label class="upload-zone" for="t-sig-file" style="padding:8px 10px;text-align:center;cursor:pointer">
+            ${ic.upload}<span><strong>${me && me.signature ? "Update" : "Upload"}</strong> signature (JPG/PNG/WebP)</span>
+          </label>
+          <input class="input" id="t-sig-file" name="teacherSignature" type="file" accept="image/jpeg,image/png,image/webp" hidden data-action="teacher:signatureUpload" />
+          ${me && me.signature ? `<div class="cell-muted" style="font-size:11px;margin-top:4px">${esc(me.signature.fileName || "signature")}</div>` : ""}
         </div>`;
 
   const bodyRows = rows.map((r, i) => {
-    if (!r) return `<tr><td colspan="8" class="cell-muted">—</td></tr>`;
+    if (!r) return `<tr><td colspan="10" class="cell-muted">—</td></tr>`;
     const hasAny = ["ca1", "ca2", "exam"].some((k) => r[k] !== "" && r[k] !== null && r[k] !== undefined);
     const total = hasAny ? Number(r.ca1 || 0) + Number(r.ca2 || 0) + Number(r.exam || 0) : "";
     const g = hasAny ? gradeFor(total) : "";
@@ -2458,6 +2534,8 @@ const classOptions = schoolClassOptions();
         <td><input class="input score-input" style="padding:7px 9px;max-width:82px" type="number" min="0" max="60" data-i="${i}" data-k="exam" value="${r?.exam ?? ""}" placeholder="0" /></td>
         <td class="cell-strong" data-total="${i}">${total === "" ? "—" : total}</td>
         <td data-grade="${i}">${gradeBadge(g)}</td>
+        <td><input class="input score-input" style="padding:7px 9px;max-width:72px" type="text" data-i="${i}" data-k="attendance" value="${esc(r?.attendance ?? "")}" placeholder="18/20" title="Attendance, e.g. 18/20" /></td>
+        <td><input class="input score-input" style="padding:7px 9px;max-width:120px" type="text" data-i="${i}" data-k="remark" value="${esc(r?.remark ?? "")}" placeholder="Remark" title="General remark" /></td>
         <td class="cell-muted" style="text-align:center"><button type="button" class="icon-btn" data-action="teacher:traits" data-student-id="${esc((r && (r.dbId || r.studentId)) || "")}" data-student-name="${esc(r?.name || "")}" title="Set Affective &amp; Psychomotor traits">${ic.edit}</button></td>
       </tr>`;
   }).join("");
@@ -2477,7 +2555,7 @@ const classOptions = schoolClassOptions();
       <div class="table-wrap">
         <table class="data broadsheet">
           <thead>
-            <tr><th class="col-idx">#</th><th class="col-name">Student</th><th>CA1</th><th>CA2</th><th>Exam</th><th>Total</th><th>Grade</th><th style="width:130px">Traits</th></tr>
+            <tr><th class="col-idx">#</th><th class="col-name">Student</th><th>CA1</th><th>CA2</th><th>Exam</th><th>Total</th><th>Grade</th><th>Attendance</th><th>Remark</th><th style="width:130px">Traits</th></tr>
           </thead>
           <tbody id="score-body">${bodyRows}</tbody>
         </table>
@@ -2823,8 +2901,8 @@ function studentResult() {
     average: liveReport?.average || 0,
     classSize: liveReport?.classSize || 0,
     position: liveReport?.position || 0,
-    attendance: { present: 0, total: 0 },
-    remark: "",
+    attendance: parseAttendance(liveReport?.attendance),
+    remark: liveReport?.remark || "",
   } : computeResult(st, term);
   const restrict = LIVE_API
     ? resultError?.code === "DEBTOR_RESULTS_RESTRICTED"
@@ -2945,13 +3023,17 @@ function studentResult() {
           <strong>${esc(r.rows.length ? r.rows[r.rows.length - 1].subject : "core subjects")}</strong> will help reach the top of the class. Keep it up!
         </div>
 
+        const ctSig = teacherSignatureFor(r.cls || (st ? st.cls : ""), s.id);
+        const prSig = principalSignatureFor(s);
         <div class="sign-row">
           <div class="sign">
             <div class="line"><span class="sig-name" id="ct-sign-name">${esc(classTeacherName(r.cls || (st ? st.cls : ""), s.id))}</span></div>
+            ${ctSig ? `<img class="sig-image" src="${esc(ctSig.contentBase64)}" alt="Class teacher signature" />` : ""}
             <div class="role">Class Teacher</div>
           </div>
           <div class="sign">
             <div class="line"><span class="sig-name" id="pr-sign-name">${esc(principalName(s))}</span></div>
+            ${prSig ? `<img class="sig-image" src="${esc(prSig.contentBase64)}" alt="Principal signature" />` : ""}
             <div class="role">Principal</div>
           </div>
         </div>
@@ -3217,6 +3299,39 @@ case "student:genPass": {
       const pfx = btn.getAttribute("data-prefix") || "Teacher";
       const input = target ? $("#"+target) : null;
       if (input) input.value = genPassword(pfx);
+      break;
+    }
+    case "teacher:signatureUpload": {
+      const input = document.getElementById("t-sig-file");
+      if (!input || !input.files || !input.files[0]) { toast("No file selected", "Choose a JPG, PNG or WebP signature image.", "error"); break; }
+      (async () => {
+        try {
+          const sig = await readSignatureFile(input.files[0]);
+          const teacher = await SyntaxApi.teacher.updateMySignature(sig);
+          liveUpsertTeacher(teacher);
+          toast("Signature saved", "Your signature is now shown on printed results.", "success");
+          render();
+        } catch (err) {
+          toast("Signature upload failed", err.message || "Could not save your signature.", "error");
+        }
+      })();
+      break;
+    }
+    case "admin:signatureUpload": {
+      const input = document.getElementById("pr-sig-file");
+      if (!input || !input.files || !input.files[0]) { toast("No file selected", "Choose a JPG, PNG or WebP signature image.", "error"); break; }
+      (async () => {
+        try {
+          const sig = await readSignatureFile(input.files[0]);
+          const school = await SyntaxApi.admin.updateProfile({ principalSignature: sig });
+          liveUpsertSchool(school);
+          state.school = schoolById(school.id);
+          toast("Principal signature saved", "The signature is now shown on printed results.", "success");
+          render();
+        } catch (err) {
+          toast("Signature upload failed", err.message || "Could not save the principal signature.", "error");
+        }
+      })();
       break;
     }
     case "student:edit": {
@@ -3573,6 +3688,8 @@ case "student:genPass": {
             ca1: Number(row.ca1) || 0,
             ca2: Number(row.ca2) || 0,
             exam: Number(row.exam) || 0,
+            ...(row.attendance ? { attendance: String(row.attendance).trim() } : {}),
+            ...(row.remark ? { remark: String(row.remark).trim() } : {}),
           }));
         (async () => {
           try {
@@ -3962,9 +4079,14 @@ document.addEventListener("input", (e) => {
   const i = Number(el.getAttribute("data-i"));
   const k = el.getAttribute("data-k");
   const rows = ensureScores(state.teacherCls, state.teacherSubj);
-  let val = el.value === "" ? "" : Math.max(0, Math.min(Number(el.value), Number(el.getAttribute("max"))));
-  if (val !== "" && val !== Number(el.value)) el.value = val;
-  rows[i][k] = val;
+  // Attendance and remark are free text; only score columns are clamped.
+  if (k === "attendance" || k === "remark") {
+    rows[i][k] = el.value;
+  } else {
+    let val = el.value === "" ? "" : Math.max(0, Math.min(Number(el.value), Number(el.getAttribute("max"))));
+    if (val !== "" && val !== Number(el.value)) el.value = val;
+    rows[i][k] = val;
+  }
   recomputeRow(i);
 });
 
@@ -4807,6 +4929,7 @@ function liveUpsertTeacher(u) {
     status: u.status || "Active",
     email: u.email,
     verified: !!u.verified,
+    signature: u.signature || null,
   };
   const existing = state.teachers.find((t) => String(t.id) === String(u.id));
   if (existing) Object.assign(existing, rec);
@@ -4994,6 +5117,8 @@ async function liveLoadTeacherBroadsheet(className, subject) {
       ca1: saved ? saved.ca1 : "",
       ca2: saved ? saved.ca2 : "",
       exam: saved ? saved.exam : "",
+      attendance: saved ? saved.attendance : "",
+      remark: saved ? saved.remark : "",
     };
   });
   scoreStore[scoreKey(className, subject)] = rows;

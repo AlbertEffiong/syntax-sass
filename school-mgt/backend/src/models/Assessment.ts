@@ -23,6 +23,10 @@ export interface IAssessment {
   exam: number;
   total: number;
   grade: string;
+  /** Teacher-entered attendance for this student this term, e.g. "18/20". */
+  attendance?: string;
+  /** Teacher-entered general remark for this student this term. */
+  remark?: string;
   status: AssessmentStatus;
   principalName: string;
   term: string;
@@ -51,6 +55,10 @@ const assessmentSchema = new Schema<IAssessmentDocument>(
     exam: { type: Number, default: 0, min: 0, max: 60 },
     total: { type: Number, default: 0, min: 0, max: 100 },
     grade: { type: String, default: '' },
+    /** Teacher-entered attendance for this student this term, e.g. "18/20". */
+    attendance: { type: String, trim: true, default: '' },
+    /** Teacher-entered general remark for this student this term. */
+    remark: { type: String, trim: true, default: '' },
     status: {
       type: String,
       enum: ['Pending Approval', 'Approved', 'Revised'],

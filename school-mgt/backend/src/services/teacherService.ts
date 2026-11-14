@@ -2,7 +2,7 @@ import { Types } from 'mongoose';
 import { ClassModel } from '../models/Class';
 import { School } from '../models/School';
 import { Student } from '../models/Student';
-import { Teacher } from '../models/Teacher';
+import { Teacher, ITeacherDocument } from '../models/Teacher';
 import { Assessment } from '../models/Assessment';
 import { ApiError } from '../utils/ApiError';
 import { computeTotal, gradeFor } from '../utils/grading';
@@ -15,6 +15,10 @@ export interface ScoreEntry {
   ca1: number;
   ca2: number;
   exam: number;
+  /** Teacher-entered attendance for this student this term, e.g. "18/20". */
+  attendance?: string;
+  /** Teacher-entered general remark for this student this term. */
+  remark?: string;
 }
 
 export interface SaveBroadsheetInput {
@@ -130,6 +134,8 @@ export async function saveBroadsheet(input: SaveBroadsheetInput): Promise<{ save
     const ca2 = clamp(entry.ca2, 20);
     const exam = clamp(entry.exam, 60);
     const total = computeTotal(ca1, ca2, exam);
+    const attendance = (entry.attendance || '').trim();
+    const remark = (entry.remark || '').trim();
 
     await Assessment.findOneAndUpdate(
       {
@@ -151,6 +157,8 @@ export async function saveBroadsheet(input: SaveBroadsheetInput): Promise<{ save
           exam,
           total,
           grade: gradeFor(total),
+          attendance,
+          remark,
           status: 'Pending Approval',
         },
         $unset: { approvedAt: 1 },
@@ -272,4 +280,27 @@ export async function notifyAdminSetup(schoolId: string, teacherId: string): Pro
     `${teacher.name || 'A teacher'} (${teacher.email || '—'}) asked the admin to configure Classes & Subjects.`,
   );
   return { sent: true, adminEmail };
+}
+
+/**
+ * Stores the authenticated teacher's own signature (base64 data URL) so it can
+ * be rendered on printed results.
+ */
+export async function updateTeacherSignature(
+  schoolId: string,
+  teacherId: string,
+  signature: { fileName: string; contentType: string; contentBase64: string },
+): Promise<ITeacherDocument> {
+  const teacher = await Teacher.findById(teacherId);
+  if (!teacher) throw ApiError.notFound('Teacher not found.', 'TEACHER_NOT_FOUND');
+  if (String(teacher.schoolId) !== String(schoolId)) {
+    throw ApiError.forbidden('This teacher does not belong to your school.', 'IDOR_BLOCKED');
+  }
+  teacher.signature = {
+    fileName: signature.fileName.trim(),
+    contentType: signature.contentType.trim(),
+    contentBase64: signature.contentBase64,
+  };
+  await teacher.save();
+  return teacher;
 }

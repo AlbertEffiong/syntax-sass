@@ -34,6 +34,8 @@ export interface SchoolPublic {
     status: string;
     receipt?: { fileName: string; contentType: string };
   };
+  /** Principal's signature (base64 data URL) shown on printed results. */
+  principalSignature?: { fileName: string; contentType: string; contentBase64: string };
   createdAt: Date;
 }
 
@@ -66,6 +68,13 @@ export function serializeSchool(school: ISchoolDocument): SchoolPublic {
         },
       } : {}),
     } : undefined,
+    ...(school.principalSignature ? {
+      principalSignature: {
+        fileName: school.principalSignature.fileName,
+        contentType: school.principalSignature.contentType,
+        contentBase64: school.principalSignature.contentBase64,
+      },
+    } : {}),
     createdAt: school.createdAt,
   };
 }
@@ -79,6 +88,8 @@ export interface TeacherPublic {
   classesTaught: number;
   status: 'Active' | 'On Leave';
   verified: boolean;
+  /** Teacher's signature (base64 data URL) shown on printed results. */
+  signature?: { fileName: string; contentType: string; contentBase64: string };
 }
 
 export function serializeTeacher(teacher: ITeacherDocument): TeacherPublic {
@@ -91,6 +102,13 @@ export function serializeTeacher(teacher: ITeacherDocument): TeacherPublic {
     classesTaught: teacher.classesTaught,
     status: teacher.status,
     verified: teacher.verified,
+    ...(teacher.signature ? {
+      signature: {
+        fileName: teacher.signature.fileName,
+        contentType: teacher.signature.contentType,
+        contentBase64: teacher.signature.contentBase64,
+      },
+    } : {}),
   };
 }
 
@@ -193,6 +211,10 @@ export interface AssessmentPublic {
   exam: number;
   total: number;
   grade: string;
+  /** Teacher-entered attendance for this student this term, e.g. "18/20". */
+  attendance?: string;
+  /** Teacher-entered general remark for this student this term. */
+  remark?: string;
   status: string;
   principalName: string;
   term: string;
@@ -215,6 +237,8 @@ export function serializeAssessment(a: IAssessmentDocument): AssessmentPublic {
     exam: a.exam,
     total: a.total,
     grade: a.grade,
+    attendance: a.attendance || '',
+    remark: a.remark || '',
     status: a.status,
     principalName: a.principalName,
     term: a.term,

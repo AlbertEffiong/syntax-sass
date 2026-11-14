@@ -12,6 +12,7 @@ import {
   studentIdParamsSchema,
   studentTraitsQuerySchema,
   upsertStudentTraitsSchema,
+  signatureSchema,
 } from '../validators/teacher.validators';
 
 const router = Router();
@@ -79,5 +80,13 @@ router.post(
   validate(upsertStudentTraitsSchema),
   traitController.upsertTraits,
 );
+
+/**
+ * @route  PATCH /api/teacher/me/signature
+ * @desc   The authenticated teacher uploads their own signature (base64 data
+ *         URL), which is rendered on printed results.
+ * @access Teacher
+ */
+router.patch('/me/signature', validate(signatureSchema), teacherController.updateMySignature);
 
 export default router;

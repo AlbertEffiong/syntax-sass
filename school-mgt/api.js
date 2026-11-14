@@ -294,14 +294,14 @@
     updateTeacher: function (id, payload) {
       return patch('/api/admin/teachers/' + encodeURIComponent(id), payload);
     },
+    changeTeacherPassword: function (id, payload) {
+      return patch('/api/admin/teachers/' + encodeURIComponent(id) + '/password', payload);
+    },
     removeTeacher: function (id) {
       return del('/api/admin/teachers/' + encodeURIComponent(id));
     },
     resendTeacherOtp: function (id) {
       return post('/api/admin/teachers/' + encodeURIComponent(id) + '/resend-otp');
-    },
-    changeTeacherPassword: function (id, payload) {
-      return patch('/api/admin/teachers/' + encodeURIComponent(id) + '/password', payload);
     },
     listAssessments: function (params) {
       return get('/api/admin/pending-assessments' + buildQuery(params));
@@ -350,6 +350,9 @@
     },
     notifyAdminSetup: function () {
       return post('/api/teacher/notify-admin-setup', {});
+    },
+    updateMySignature: function (signature) {
+      return patch('/api/teacher/me/signature', { signature: signature });
     },
     traits: {
       get: function (studentId, params) {

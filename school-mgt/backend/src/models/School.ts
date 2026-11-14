@@ -40,6 +40,8 @@ export interface ISchool {
   restrictDebtors: boolean;
   academic: IAcademicSetting;
   pendingPayment?: IPendingPayment;
+  /** Principal's signature (base64 data URL) shown on printed results. */
+  principalSignature?: { fileName: string; contentType: string; contentBase64: string };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -124,6 +126,12 @@ const schoolSchema = new Schema<ISchoolDocument, ISchoolModel>(
       match: [/^[A-Z]{2,6}$/, 'School prefix must be 2-6 uppercase letters'],
     },
     principalName: { type: String, trim: true, default: '' },
+    /** Principal's signature, stored as a base64 data URL, shown on printed results. */
+    principalSignature: {
+      fileName: { type: String, trim: true },
+      contentType: { type: String, trim: true },
+      contentBase64: { type: String },
+    },
     planMonthly: { type: Number, default: 49, min: 0 },
     restrictDebtors: { type: Boolean, default: false },
     academic: { type: academicSchema, default: () => ({}) },

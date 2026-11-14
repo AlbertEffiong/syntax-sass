@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler';
 import { ok } from '../utils/response';
 import { ApiError } from '../utils/ApiError';
+import { serializeTeacher } from '../utils/serialize';
 import * as teacherService from '../services/teacherService';
 import { SaveBroadsheetBody, SubmitBroadsheetBody } from '../validators/teacher.validators';
 
@@ -84,6 +85,24 @@ function requireTeacherId(req: Request): string {
 export const notifyAdminSetup = asyncHandler(async (req: Request, res: Response) => {
   const result = await teacherService.notifyAdminSetup(requireTenant(req), requireTeacherId(req));
   return ok(res, result, 'Admin notified to set up Classes & Subjects.');
+});
+
+/**
+ * PATCH /api/teacher/me/signature
+ * The authenticated teacher uploads their own signature (base64 data URL),
+ * which is shown on printed results.
+ */
+export const updateMySignature = asyncHandler(async (req: Request, res: Response) => {
+  const body = req.body as { signature?: { fileName: string; contentType: string; contentBase64: string } };
+  if (!body?.signature?.contentBase64) {
+    throw ApiError.badRequest('A signature image is required.', 'SIGNATURE_REQUIRED');
+  }
+  const teacher = await teacherService.updateTeacherSignature(
+    requireTenant(req),
+    requireTeacherId(req),
+    body.signature,
+  );
+  return ok(res, serializeTeacher(teacher), 'Signature saved.');
 });
 
 function requireTeacherEmail(req: Request): string {

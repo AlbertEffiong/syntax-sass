@@ -702,11 +702,18 @@ export async function getPendingPaymentReceipt(schoolId: string) {
 
 export async function updateSchoolSettings(
   schoolId: string,
-  patch: { principalName?: string; currentPassword?: string; newPassword?: string },
+  patch: { principalName?: string; currentPassword?: string; newPassword?: string; principalSignature?: { fileName: string; contentType: string; contentBase64: string } },
 ): Promise<SchoolPublic> {
   const school = await School.findById(schoolId).select('+password');
   if (!school) throw ApiError.notFound('School not found.', 'SCHOOL_NOT_FOUND');
   if (patch.principalName !== undefined) school.principalName = patch.principalName;
+  if (patch.principalSignature) {
+    school.principalSignature = {
+      fileName: patch.principalSignature.fileName.trim(),
+      contentType: patch.principalSignature.contentType.trim(),
+      contentBase64: patch.principalSignature.contentBase64,
+    };
+  }
   if (patch.newPassword) {
     if (!patch.currentPassword) throw ApiError.badRequest('Current password required.', 'CURRENT_PASSWORD_REQUIRED');
     const ok = await verifyPassword(patch.currentPassword, school.password);

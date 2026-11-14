@@ -16,6 +16,8 @@ export interface ITeacher {
   verified: boolean;
   otpHash?: string;
   otpExpiresAt?: Date;
+  /** Teacher's signature, stored as a base64 data URL, shown on printed results. */
+  signature?: { fileName: string; contentType: string; contentBase64: string };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,6 +36,11 @@ const teacherSchema = new Schema<ITeacherDocument>(
     verified: { type: Boolean, default: false },
     otpHash: { type: String, select: false },
     otpExpiresAt: { type: Date, select: false },
+    signature: {
+      fileName: { type: String, trim: true },
+      contentType: { type: String, trim: true },
+      contentBase64: { type: String },
+    },
   },
   {
     timestamps: true,

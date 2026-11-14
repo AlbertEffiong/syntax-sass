@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { emailSchema, objectIdSchema, passwordSchema } from './common';
+import { emailSchema, objectIdSchema, passwordSchema, signatureSchema } from './common';
 import { paginationSchema } from '../utils/pagination';
 
 export const createClassSchema = z.object({
@@ -135,6 +135,32 @@ export const academicSettingSchema = z.object({
   currentTerm: z.string().trim().min(1).optional(),
   termsPerSession: z.number().int().min(1).max(4).optional(),
 });
+
+/**
+ * PATCH /api/admin/school — updates the tenant's school profile. All fields are
+ * optional; a password change requires the current password.
+ */
+export const updateSchoolSettingsSchema = z
+  .object({
+    principalName: z.string().trim().min(2).optional(),
+    currentPassword: z.string().optional(),
+    newPassword: passwordSchema.optional(),
+    principalSignature: signatureSchema.optional(),
+  })
+  .refine(
+    (v) =>
+      v.principalName !== undefined ||
+      v.currentPassword !== undefined ||
+      v.newPassword !== undefined ||
+      v.principalSignature !== undefined,
+    { message: 'Provide at least one field to update.' },
+  )
+  .refine((v) => !v.newPassword || v.currentPassword, {
+    message: 'Current password is required to change the password.',
+    path: ['currentPassword'],
+  });
+
+export type UpdateSchoolSettingsBody = z.infer<typeof updateSchoolSettingsSchema>;
 
 export type CreateClassBody = z.infer<typeof createClassSchema>;
 export type EnrollStudentBody = z.infer<typeof enrollStudentSchema>;
