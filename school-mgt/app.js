@@ -258,6 +258,41 @@ function findStudentByLogin(input) {
     || state.students.find((s) => (s.name || "").toUpperCase() === up)
     || null;
 }
+function openConfirmModal(opts) {
+  return new Promise((resolve) => {
+    const close = () => resolve(false);
+    const ok = () => resolve(true);
+    const existing = document.querySelector(".modal-backdrop");
+    if (existing) existing.remove();
+    const wrap = document.createElement("div");
+    wrap.className = "modal-backdrop";
+    wrap.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" aria-title="${esc(opts.title || "Confirm")}" style="max-width:460px">
+        <div class="modal-head">
+          <div><h3>${esc(opts.title || "Confirm")}</h3>${opts.sub ? `<div class="sub">${esc(opts.sub)}</div>` : ""}</div>
+          <button class="close-x" data-action="confirm:close">${ic.x}</button>
+        </div>
+        <div class="modal-body">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <div class="stat-icon amber" style="width:40px;height:40px;flex:0 0 auto">${ic.alert}</div>
+            <div class="cell-muted" style="font-size:14px;line-height:1.5">${esc(opts.message || "Are you sure?")}</div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-ghost" data-action="confirm:close">${esc(opts.cancelLabel || "Cancel")}</button>
+          <button type="button" class="btn btn-primary" data-action="confirm:ok">${esc(opts.okLabel || "Confirm")}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });
+    wrap.querySelector('[data-action="confirm:close"]').addEventListener("click", close);
+    wrap.querySelector('[data-action="confirm:ok"]').addEventListener("click", ok);
+  });
+}
+function confirmAction(message, sub, okLabel, cancelLabel) {
+  return openConfirmModal({ title: "Confirm", message, sub, okLabel, cancelLabel });
+}
+
 function ageFromDob(dob) {
   if (!dob) return "—";
   const d = new Date(dob);
@@ -2255,12 +2290,12 @@ function adminProfile() {
       <div class="card">
         <h3 style="margin-bottom:14px">Principal Signature</h3>
         <span class="hint">Uploaded signatures are rendered on every printed report card under the Principal line. Use a JPG, PNG or WebP image.</span>
-        ${s.principalSignature ? `
-          <div class="sig-preview" style="margin:12px 0">
+        <div id="pr-sig-preview" style="margin:12px 0">
+          ${s.principalSignature ? `
             <img src="${esc(s.principalSignature.contentBase64)}" alt="Principal signature" style="max-height:90px;max-width:220px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:6px" />
             <div class="cell-muted" style="font-size:12px;margin-top:6px">${esc(s.principalSignature.fileName || "signature")}</div>
-          </div>
-        ` : `<div class="cell-muted" style="margin:12px 0;padding:14px;border:1px dashed var(--line);border-radius:8px;text-align:center">No signature uploaded yet.</div>`}
+          ` : `<div class="cell-muted" style="padding:14px;border:1px dashed var(--line);border-radius:8px;text-align:center">No signature uploaded yet.</div>`}
+        </div>
         <label class="upload-zone" for="pr-sig-file">${ic.upload}<span><strong>Click to attach</strong> or drop a signature image</span></label>
         <input class="input" id="pr-sig-file" name="principalSignature" type="file" accept="image/jpeg,image/png,image/webp" hidden data-action="admin:signatureUpload" />
         <div class="modal-foot" style="padding:0;margin-top:14px">
@@ -2638,8 +2673,10 @@ const bodyRows = rows.map((r, i) => {
           <label class="upload-zone" for="t-sig-file" style="padding:10px;text-align:center;cursor:pointer">
             ${ic.upload}<span><strong>${me && me.signature ? "Update" : "Upload"}</strong> signature</span>
           </label>
-          <input class="input" id="t-sig-file" name="teacherSignature" type="file" accept="image/jpeg,image/png,image/webp" hidden data-action="teacher:signatureUpload" />
-          ${me && me.signature ? `<div class="cell-muted" style="font-size:11px;margin-top:4px">${esc(me.signature.fileName || "signature")}</div>` : ""}
+          <input class="input" id="t-sig-file" name="teacherSignature" type="file" accept="image/jpeg,image/png,image/webp" hidden data-action="teacher:signatureUpload" data-preview="t-sig-preview" />
+          <div id="t-sig-preview" style="margin-top:6px">
+            ${me && me.signature ? `<img src="${esc(me.signature.contentBase64)}" alt="Teacher signature" style="max-height:56px;max-width:160px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px" />` : `<div class="cell-muted" style="font-size:11px">No signature uploaded yet.</div>`}
+          </div>
         </div>
         <div class="field" style="flex:0 0 auto">
           <label>&nbsp;</label>
@@ -2959,6 +2996,11 @@ function studentResult() {
     ? (liveReport?.psychomotor || []).map((t) => [t.trait || "", t.rating || ""])
     : (st && Array.isArray(st.psychomotor) ? st.psychomotor.map((t) => [t.trait || "", t.rating || ""]) : []);
 
+  const ctSig = teacherSignatureFor(r.cls || (st ? st.cls : ""), s.id);
+  const prSig = principalSignatureFor(s);
+  const ctSigImg = ctSig ? `<img class="sig-image" src="${esc(ctSig.contentBase64)}" alt="Class teacher signature" />` : "";
+  const prSigImg = prSig ? `<img class="sig-image" src="${esc(prSig.contentBase64)}" alt="Principal signature" />` : "";
+
   return `
   <div class="page result-shell">
     <div class="result-actions">
@@ -3033,17 +3075,15 @@ function studentResult() {
           <strong>${esc(r.rows.length ? r.rows[r.rows.length - 1].subject : "core subjects")}</strong> will help reach the top of the class. Keep it up!
         </div>
 
-        const ctSig = teacherSignatureFor(r.cls || (st ? st.cls : ""), s.id);
-        const prSig = principalSignatureFor(s);
         <div class="sign-row">
           <div class="sign">
             <div class="line"><span class="sig-name" id="ct-sign-name">${esc(classTeacherName(r.cls || (st ? st.cls : ""), s.id))}</span></div>
-            ${ctSig ? `<img class="sig-image" src="${esc(ctSig.contentBase64)}" alt="Class teacher signature" />` : ""}
+            ${ctSigImg}
             <div class="role">Class Teacher</div>
           </div>
           <div class="sign">
             <div class="line"><span class="sig-name" id="pr-sign-name">${esc(principalName(s))}</span></div>
-            ${prSig ? `<img class="sig-image" src="${esc(prSig.contentBase64)}" alt="Principal signature" />` : ""}
+            ${prSigImg}
             <div class="role">Principal</div>
           </div>
         </div>
@@ -3314,9 +3354,15 @@ case "student:genPass": {
     case "teacher:signatureUpload": {
       const input = document.getElementById("t-sig-file");
       if (!input || !input.files || !input.files[0]) { toast("No file selected", "Choose a JPG, PNG or WebP signature image.", "error"); break; }
+      const file = input.files[0];
       (async () => {
         try {
-          const sig = await readSignatureFile(input.files[0]);
+          const sig = await readSignatureFile(file);
+          // Show the chosen image for confirmation before uploading.
+          const preview = document.getElementById("t-sig-preview");
+          if (preview) preview.innerHTML = `<img src="data:${sig.contentType};base64,${sig.contentBase64}" alt="Signature preview" style="max-height:56px;max-width:160px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px" /><div class="cell-muted" style="font-size:11px;margin-top:6px">${esc(file.name)} · ready to upload</div>`;
+          const confirmed = await confirmAction("Confirm signature upload?", `Upload ${file.name} as your signature? It will appear on every printed report card under your name.`, "Upload Signature", "Keep editing");
+          if (!confirmed) { if (preview) preview.innerHTML = me && me.signature ? `<img src="${esc(me.signature.contentBase64)}" alt="Teacher signature" style="max-height:56px;max-width:160px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px" />` : `<div class="cell-muted" style="font-size:11px">No signature uploaded yet.</div>`; input.value = ""; return; }
           const teacher = await SyntaxApi.teacher.updateMySignature(sig);
           liveUpsertTeacher(teacher);
           toast("Signature saved", "Your signature is now shown on printed results.", "success");
@@ -3330,9 +3376,15 @@ case "student:genPass": {
     case "admin:signatureUpload": {
       const input = document.getElementById("pr-sig-file");
       if (!input || !input.files || !input.files[0]) { toast("No file selected", "Choose a JPG, PNG or WebP signature image.", "error"); break; }
+      const file = input.files[0];
+      const s = state.school;
       (async () => {
         try {
-          const sig = await readSignatureFile(input.files[0]);
+          const sig = await readSignatureFile(file);
+          const preview = document.getElementById("pr-sig-preview");
+          if (preview) preview.innerHTML = `<img src="data:${sig.contentType};base64,${sig.contentBase64}" alt="Signature preview" style="max-height:90px;max-width:220px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:6px" /><div class="cell-muted" style="font-size:12px;margin-top:6px">${esc(file.name)} · ready to upload</div>`;
+          const confirmed = await confirmAction("Confirm principal signature upload?", `Upload ${file.name} as the principal's signature? It will appear on every printed report card under the Principal line.`, "Upload Signature", "Keep editing");
+          if (!confirmed) { if (preview) preview.innerHTML = s && s.principalSignature ? `<img src="${esc(s.principalSignature.contentBase64)}" alt="Principal signature" style="max-height:90px;max-width:220px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:6px" />` : `<div class="cell-muted" style="padding:14px;border:1px dashed var(--border);border-radius:8px;text-align:center">No signature uploaded yet.</div>`; input.value = ""; return; }
           const school = await SyntaxApi.admin.updateProfile({ principalSignature: sig });
           liveUpsertSchool(school);
           state.school = schoolById(school.id);
