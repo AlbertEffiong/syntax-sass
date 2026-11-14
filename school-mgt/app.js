@@ -2505,22 +2505,7 @@ const classOptions = schoolClassOptions();
       <button type="button" class="seg-tab ${tab === "upload" ? "active" : ""}" role="tab" aria-selected="${tab === "upload"}" data-action="teacher:tab" data-tab="upload">${ic.upload}<span>Bulk Result Upload</span></button>
     </div>`;
 
-  const principalField = `
-        <div class="field">
-          <label for="t-principal">Principal Name</label>
-          <input class="input" id="t-principal" data-action="principal:set" value="${esc(principalName(state.school || {}))}" placeholder="e.g. A. Bello" autocomplete="off" />
-          <span class="hint">Attached to reports &amp; approval sheets</span>
-        </div>
-        <div class="field">
-          <label for="t-sig-file">Your Signature</label>
-          <label class="upload-zone" for="t-sig-file" style="padding:8px 10px;text-align:center;cursor:pointer">
-            ${ic.upload}<span><strong>${me && me.signature ? "Update" : "Upload"}</strong> signature (JPG/PNG/WebP)</span>
-          </label>
-          <input class="input" id="t-sig-file" name="teacherSignature" type="file" accept="image/jpeg,image/png,image/webp" hidden data-action="teacher:signatureUpload" />
-          ${me && me.signature ? `<div class="cell-muted" style="font-size:11px;margin-top:4px">${esc(me.signature.fileName || "signature")}</div>` : ""}
-        </div>`;
-
-  const bodyRows = rows.map((r, i) => {
+const bodyRows = rows.map((r, i) => {
     if (!r) return `<tr><td colspan="10" class="cell-muted">—</td></tr>`;
     const hasAny = ["ca1", "ca2", "exam"].some((k) => r[k] !== "" && r[k] !== null && r[k] !== undefined);
     const total = hasAny ? Number(r.ca1 || 0) + Number(r.ca2 || 0) + Number(r.exam || 0) : "";
@@ -2543,7 +2528,10 @@ const classOptions = schoolClassOptions();
   const manualCard = `
     <div class="card card-pad-0">
       <div class="card-head">
-        <div><h3>${esc(cls)} — ${esc(subj || "—")}</h3><div class="hint">${rows.length} students on the broadsheet</div></div>
+        <div>
+          <h3>${esc(cls)} — ${esc(subj || "—")}</h3>
+          <div class="hint">${rows.length} students on the broadsheet · CA1 ≤ 20 · CA2 ≤ 20 · Exam ≤ 60</div>
+        </div>
         <div class="legend">
           <span class="item"><span class="swatch" style="background:var(--green-bg)"></span>A ≥ 70</span>
           <span class="item"><span class="swatch" style="background:var(--blue-50)"></span>B ≥ 60</span>
@@ -2555,7 +2543,18 @@ const classOptions = schoolClassOptions();
       <div class="table-wrap">
         <table class="data broadsheet">
           <thead>
-            <tr><th class="col-idx">#</th><th class="col-name">Student</th><th>CA1</th><th>CA2</th><th>Exam</th><th>Total</th><th>Grade</th><th>Attendance</th><th>Remark</th><th style="width:130px">Traits</th></tr>
+            <tr>
+              <th class="col-idx">#</th>
+              <th class="col-name">Student</th>
+              <th>CA1</th>
+              <th>CA2</th>
+              <th>Exam</th>
+              <th>Total</th>
+              <th>Grade</th>
+              <th>Attendance</th>
+              <th>Remark</th>
+              <th style="width:130px">Traits</th>
+            </tr>
           </thead>
           <tbody id="score-body">${bodyRows}</tbody>
         </table>
@@ -2608,9 +2607,8 @@ const classOptions = schoolClassOptions();
 
     ${tabBar}
 
-    <div class="card" style="margin-bottom:20px">
-      <div class="toolbar">
-        <div class="field class-field ${classQuery ? "has-query" : ""}" style="position:relative">
+    <div class="toolbar-card" style="margin-bottom:20px">
+      <div class="field" style="min-width:220px;flex:1 1 220px">
           <label for="t-class">Class</label>
           <input class="input" id="t-class" type="text" autocomplete="off" data-action="teacher:classSearch"
             value="${esc(classQuery || cls)}" placeholder="Type to search a class…" />
@@ -2619,21 +2617,33 @@ const classOptions = schoolClassOptions();
             ${classMatches.map((c) => `<button type="button" class="combo-item ${normClass(c) === normClass(cls) ? "active" : ""}" data-action="teacher:classPick" data-class="${esc(c)}"><span>${esc(c)}</span>${normClass(c) === normClass(cls) ? `<span class="combo-current">current</span>` : ""}</button>`).join("") || `<div class="combo-empty">No matching classes</div>`}
           </div>
         </div>
-        <div class="field">
-          <label for="t-subj">Subjects for ${esc(cls)}</label>
+        <div class="field" style="min-width:220px;flex:1 1 220px">
+          <label for="t-subj">Subject</label>
           <select class="select" id="t-subj" data-action="teacher:subject">
             ${subjOptions.map((s) => `<option ${s === subj ? "selected" : ""}>${esc(s)}</option>`).join("") || `<option value="">No subjects configured</option>`}
           </select>
-          <span class="hint">${subjOptions.length} subject${subjOptions.length === 1 ? "" : "s"} fetched from the class curriculum</span>
+          <span class="hint">${subjOptions.length} subject${subjOptions.length === 1 ? "" : "s"} from the class curriculum</span>
         </div>
-        <div class="field">
-          <label>Search Subject</label>
-          <input class="input" data-action="teacher:subjectSearch" value="${esc(state.teacherSubjectFilter || "")}" placeholder="Type to filter subjects…" />
+        <div class="field" style="min-width:180px;flex:0 0 180px">
+          <label for="t-subj-search">Filter Subjects</label>
+          <input class="input" id="t-subj-search" data-action="teacher:subjectSearch" value="${esc(state.teacherSubjectFilter || "")}" placeholder="Type to filter…" />
         </div>
-        ${principalField}
-        <div class="field">
+        <div class="field" style="min-width:200px;flex:0 0 200px">
+          <label for="t-principal">Principal Name</label>
+          <input class="input" id="t-principal" data-action="principal:set" value="${esc(principalName(state.school || {}))}" placeholder="e.g. A. Bello" autocomplete="off" />
+          <span class="hint">Printed on every report card</span>
+        </div>
+        <div class="field" style="min-width:180px;flex:0 0 180px">
+          <label for="t-sig-file">Your Signature</label>
+          <label class="upload-zone" for="t-sig-file" style="padding:10px;text-align:center;cursor:pointer">
+            ${ic.upload}<span><strong>${me && me.signature ? "Update" : "Upload"}</strong> signature</span>
+          </label>
+          <input class="input" id="t-sig-file" name="teacherSignature" type="file" accept="image/jpeg,image/png,image/webp" hidden data-action="teacher:signatureUpload" />
+          ${me && me.signature ? `<div class="cell-muted" style="font-size:11px;margin-top:4px">${esc(me.signature.fileName || "signature")}</div>` : ""}
+        </div>
+        <div class="field" style="flex:0 0 auto">
           <label>&nbsp;</label>
-          <div class="badge badge-info" style="padding:10px 14px">CA1 ≤ 20 · CA2 ≤ 20 · Exam ≤ 60 · Total /100</div>
+          <div class="badge badge-info" style="padding:10px 14px;white-space:nowrap">CA1 ≤ 20 · CA2 ≤ 20 · Exam ≤ 60 · Total /100</div>
         </div>
       </div>
     </div>
