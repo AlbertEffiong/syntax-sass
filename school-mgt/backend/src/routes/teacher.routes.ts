@@ -4,6 +4,7 @@ import * as traitController from '../controllers/traitController';
 import { authenticate, authorize } from '../middleware/auth';
 import { enforceTenant } from '../middleware/tenant';
 import { validate } from '../middleware/validate';
+import { signatureUpload } from '../middleware/upload';
 import {
   broadsheetQuerySchema,
   saveBroadsheetSchema,
@@ -12,7 +13,6 @@ import {
   studentIdParamsSchema,
   studentTraitsQuerySchema,
   upsertStudentTraitsSchema,
-  signatureSchema,
 } from '../validators/teacher.validators';
 
 const router = Router();
@@ -87,6 +87,6 @@ router.post(
  *         URL), which is rendered on printed results.
  * @access Teacher
  */
-router.patch('/me/signature', validate(signatureSchema), teacherController.updateMySignature);
+router.patch('/me/signature', signatureUpload, teacherController.updateMySignature);
 
 export default router;

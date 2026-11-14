@@ -5,7 +5,7 @@ import { ApiError } from '../utils/ApiError';
 import { serializeTeacher } from '../utils/serialize';
 import * as teacherService from '../services/teacherService';
 import * as uploadService from '../services/uploadService';
-import { SaveBroadsheetBody, SubmitBroadsheetBody } from '../validators/teacher.validators';
+import { SaveBroadsheetBody, SubmitBroadsheetBody, signatureSchema } from '../validators/teacher.validators';
 
 /**
  * GET /api/teacher/classes-subjects
@@ -90,16 +90,29 @@ export const notifyAdminSetup = asyncHandler(async (req: Request, res: Response)
 
 /**
  * PATCH /api/teacher/me/signature
- * The authenticated teacher uploads their own signature (multipart file),
- * which is rendered on printed results. Falls back to base64-in-document
- * storage when no object storage is configured.
+ * The authenticated teacher uploads their own signature, which is rendered on
+ * printed results. Accepts either a multipart file (`signature`) or a JSON
+ * `{ signature: { fileName, contentType, contentBase64 } }` body, so the
+ * browser client and direct API callers both work.
  */
 export const updateMySignature = asyncHandler(async (req: Request, res: Response) => {
   const file = (req as Request & { file?: Express.Multer.File }).file;
-  if (!file) {
-    throw ApiError.badRequest('A signature image is required.', 'SIGNATURE_REQUIRED');
+  let stored: uploadService.UploadedFile;
+  if (file) {
+    stored = await uploadService.storeUpload(file);
+  } else {
+    const raw = (req.body && req.body.signature) ? req.body.signature : req.body;
+    const parsed = signatureSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw ApiError.badRequest('A signature image is required.', 'SIGNATURE_REQUIRED');
+    }
+    stored = {
+      fileName: parsed.data.fileName,
+      contentType: parsed.data.contentType,
+      size: 0,
+      contentBase64: parsed.data.contentBase64,
+    };
   }
-  const stored = await uploadService.storeUpload(file);
   const teacher = await teacherService.updateTeacherSignature(
     requireTenant(req),
     requireTeacherId(req),

@@ -3,6 +3,7 @@ import { Student, IStudentDocument } from '../models/Student';
 import { StudentTrait } from '../models/StudentTrait';
 import { Teacher } from '../models/Teacher';
 import { Assessment } from '../models/Assessment';
+import { ClassModel } from '../models/Class';
 import { ApiError } from '../utils/ApiError';
 import { gradeFor, remarkFor } from '../utils/grading';
 import { assertSameSchool } from '../utils/security';
@@ -44,9 +45,19 @@ export interface ReportCard {
   remark: string;
   principalName: string;
   classTeacherName: string;
+  /** Signatures rendered under the class teacher / principal lines. */
+  principalSignature?: SignaturePayload | null;
+  classTeacherSignature?: SignaturePayload | null;
   affective: { trait: string; rating: string }[];
   psychomotor: { trait: string; rating: string }[];
   published: boolean;
+}
+
+export interface SignaturePayload {
+  fileName: string;
+  contentType: string;
+  url?: string;
+  contentBase64?: string;
 }
 
 export interface GetResultsInput {
@@ -94,13 +105,28 @@ export async function getResults(input: GetResultsInput): Promise<ReportCard> {
   });
 
   if (assessments.length === 0) {
-    return buildFromHistory(student, term, session, school?.principalName ?? '', input.schoolId, school?.name ?? '', affective, psychomotor);
+    return buildFromHistory(student, term, session, school?.principalName ?? '', input.schoolId, school?.name ?? '', affective, psychomotor, school?.principalSignature ?? null);
   }
 
-  // Resolve dynamic teacher names for each subject.
-  const teacherEmails = Array.from(new Set(assessments.map((a) => a.teacherEmail)));
+  // Resolve dynamic teacher names for each subject. The class teacher is
+  // resolved from the class record so their signature can be printed too.
+  const cls = await ClassModel.findOne({
+    schoolId: input.schoolId,
+    className: student.currentClass,
+  });
+  const teacherEmails = Array.from(new Set([
+    ...assessments.map((a) => a.teacherEmail),
+    ...(cls?.teacherEmail ? [cls.teacherEmail] : []),
+  ].filter(Boolean)));
   const teachers = await Teacher.find({ schoolId: input.schoolId, email: { $in: teacherEmails } });
   const teacherByEmail = new Map(teachers.map((t) => [t.email, t.name]));
+  const teacherSigByEmail = new Map(teachers.map((t) => [t.email, t.signature ?? null]));
+  const classTeacher = cls?.teacherEmail
+    ? teachers.find((t) => t.email === cls.teacherEmail) ?? null
+    : null;
+  const classTeacherSignature = classTeacher
+    ? (teacherSigByEmail.get(classTeacher.email) ?? null)
+    : (teachers[0] ? teacherSigByEmail.get(teachers[0].email) ?? null : null);
 
   const subjects: ReportSubject[] = assessments
     .map((a) => ({
@@ -156,6 +182,8 @@ export async function getResults(input: GetResultsInput): Promise<ReportCard> {
     remark,
     principalName,
     classTeacherName: classTeacherNames[0] ?? '',
+    principalSignature: school?.principalSignature ?? null,
+    classTeacherSignature,
     affective,
     psychomotor,
     published: true,
@@ -223,6 +251,7 @@ function buildFromHistory(
   schoolName: string,
   affective: { trait: string; rating: string }[],
   psychomotor: { trait: string; rating: string }[],
+  principalSignature: SignaturePayload | null,
 ): ReportCard {
   const doc = student;
   const history =
@@ -268,6 +297,8 @@ function buildFromHistory(
     remark: history.remark || '',
     principalName: history.principalName || principalNameFromSchool,
     classTeacherName: history.classTeacherName,
+    principalSignature,
+    classTeacherSignature: null,
     affective,
     psychomotor,
     published: true,

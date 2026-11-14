@@ -63,6 +63,7 @@ export async function getTeacherContext(schoolId: string, teacherId?: string) {
   if (teacher) {
     data.teacherName = teacher.name;
     data.teacherEmail = teacher.email;
+    data.teacherSignature = teacher.signature || null;
   }
   return data;
 }
@@ -135,8 +136,8 @@ export async function saveBroadsheet(input: SaveBroadsheetInput): Promise<{ save
     const ca2 = clamp(entry.ca2, 20);
     const exam = clamp(entry.exam, 60);
     const total = computeTotal(ca1, ca2, exam);
-    const attendance = (entry.attendance || '').trim();
-    const remark = (entry.remark || '').trim();
+    const attendance = clampAttendance(entry.attendance);
+    const remark = (entry.remark || '').trim().slice(0, 400);
 
     await Assessment.findOneAndUpdate(
       {
@@ -248,6 +249,20 @@ export async function getBroadsheet(
 function clamp(value: number, max: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(max, Math.round(value)));
+}
+
+/**
+ * Normalises a teacher-entered attendance value. Accepts a percentage (e.g.
+ * "85", "85%") which is clamped to 0-100, or a fraction (e.g. "18/20") which is
+ * kept as-is. Returns a trimmed string.
+ */
+function clampAttendance(value?: string): string {
+  const raw = (value || '').trim();
+  if (!raw) return '';
+  if (/^\d+(?:\.\d+)?\s*\/\s*\d+(?:\.\d+)?$/.test(raw)) return raw;
+  const num = Number(raw.replace(/%/g, ''));
+  if (!Number.isFinite(num)) return raw;
+  return String(Math.max(0, Math.min(100, Math.round(num))));
 }
 
 /**

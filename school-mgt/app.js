@@ -329,12 +329,45 @@ function readSignatureFile(file) {
   });
 }
 function parseAttendance(att) {
-  if (!att) return { present: 0, total: 0 };
-  if (typeof att === "object" && "present" in att) return { present: Number(att.present) || 0, total: Number(att.total) || 0 };
-  const m = String(att).match(/(\d+)\s*\/\s*(\d+)/);
-  if (m) return { present: Number(m[1]) || 0, total: Number(m[2]) || 0 };
-  const n = Number(att);
-  return isNaN(n) ? { present: 0, total: 0 } : { present: n, total: 0 };
+  if (!att) return { present: 0, total: 0, percent: null };
+  if (typeof att === "object" && "present" in att) {
+    const present = Number(att.present) || 0;
+    const total = Number(att.total) || 0;
+    const percent = total > 0
+      ? (present / total) * 100
+      : (att.percent !== undefined && att.percent !== null ? Number(att.percent) : null);
+    return { present, total, percent };
+  }
+  const s = String(att).trim();
+  const m = s.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
+  if (m) {
+    const present = Number(m[1]) || 0;
+    const total = Number(m[2]) || 0;
+    return { present, total, percent: total > 0 ? (present / total) * 100 : null };
+  }
+  const pct = s.match(/(\d+(?:\.\d+)?)\s*%/) || s.match(/^(\d+(?:\.\d+)?)$/);
+  if (pct) {
+    const percent = Math.max(0, Math.min(100, Number(pct[1]) || 0));
+    return { present: percent, total: 0, percent };
+  }
+  return { present: 0, total: 0, percent: null };
+}
+
+/** Human-readable attendance for the report: "18 / 20 (90%)", "85%" or "—". */
+function attendanceLabel(att) {
+  const p = parseAttendance(att);
+  if (p.percent === null) return "—";
+  const pct = p.percent.toFixed(1).replace(/\.0$/, "");
+  return p.total > 0 ? `${p.present} / ${p.total} (${pct}%)` : `${pct}%`;
+}
+
+/** Clamps an attendance input value to a 0-100 percentage (fractions pass through). */
+function clampPct(v) {
+  const s = String(v ?? "").trim();
+  if (!s || s.includes("/")) return s;
+  const n = Number(s.replace(/%/g, ""));
+  if (isNaN(n)) return s;
+  return String(Math.max(0, Math.min(100, n)));
 }
 
 function teacherSignatureFor(cls, schoolId) {
@@ -355,6 +388,20 @@ function teacherSignatureFor(cls, schoolId) {
 function principalSignatureFor(s) {
   if (!s) return null;
   return s.principalSignature || null;
+}
+
+/**
+ * Returns a renderable `src` for a stored signature. The backend stores either
+ * a public `url` (object storage) or a raw base64 payload (`contentBase64`)
+ * without the `data:` prefix, so it must be rebuilt before use in an <img>.
+ */
+function signatureSrc(sig) {
+  if (!sig) return "";
+  if (sig.url) return String(sig.url);
+  const b64 = String(sig.contentBase64 || "").trim();
+  if (!b64) return "";
+  const type = String(sig.contentType || "image/png").trim() || "image/png";
+  return `data:${type};base64,${b64}`;
 }
 
 function ordinal(n) {
@@ -2294,7 +2341,7 @@ function adminProfile() {
         <span class="hint">Uploaded signatures are rendered on every printed report card under the Principal line. Use a JPG, PNG or WebP image.</span>
         <div id="pr-sig-preview" style="margin:12px 0">
           ${s.principalSignature ? `
-            <img src="${esc(s.principalSignature.contentBase64)}" alt="Principal signature" style="max-height:90px;max-width:220px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:6px" />
+            <img src="${esc(signatureSrc(s.principalSignature))}" alt="Principal signature" style="max-height:90px;max-width:220px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:6px" />
             <div class="cell-muted" style="font-size:12px;margin-top:6px">${esc(s.principalSignature.fileName || "signature")}</div>
           ` : `<div class="cell-muted" style="padding:14px;border:1px dashed var(--line);border-radius:8px;text-align:center">No signature uploaded yet.</div>`}
         </div>
@@ -2441,6 +2488,8 @@ function assessmentDetailsModal(details) {
       <td>${r.ca1 ?? "—"}</td><td>${r.ca2 ?? "—"}</td><td>${r.exam ?? "—"}</td>
       <td class="cell-strong">${r.total ?? "—"}</td>
       <td><span class="badge ${r.grade === "F" ? "badge-expired" : r.grade ? "badge-active" : "badge-muted"}">${esc(r.grade || "—")}</span></td>
+      <td>${r.attendance ? esc(attendanceLabel(r.attendance)) : "—"}</td>
+      <td style="font-size:12px;max-width:200px">${esc(r.remark || "—")}</td>
       <td style="font-size:12px;max-width:220px">${esc(traitListText(r.affective))}</td>
       <td style="font-size:12px;max-width:220px">${esc(traitListText(r.psychomotor))}</td>
     </tr>`).join("");
@@ -2453,8 +2502,8 @@ function assessmentDetailsModal(details) {
     <div class="modal-body" style="max-height:70vh;overflow:auto">
       <div class="table-wrap">
         <table class="data">
-          <thead><tr><th>#</th><th>Student</th><th>CA1</th><th>CA2</th><th>Exam</th><th>Total</th><th>Grade</th><th>Affective Traits</th><th>Psychomotor Traits</th></tr></thead>
-          <tbody>${body || `<tr><td colspan="9" class="cell-muted" style="text-align:center;padding:18px">No rows found.</td></tr>`}</tbody>
+          <thead><tr><th>#</th><th>Student</th><th>CA1</th><th>CA2</th><th>Exam</th><th>Total</th><th>Grade</th><th>Attendance</th><th>Remark</th><th>Affective Traits</th><th>Psychomotor Traits</th></tr></thead>
+          <tbody>${body || `<tr><td colspan="11" class="cell-muted" style="text-align:center;padding:18px">No rows found.</td></tr>`}</tbody>
         </table>
       </div>
       <div class="hint" style="margin-top:10px">Review scores and traits, then close and choose <strong>Approve</strong> or <strong>Request Revision</strong>.</div>
@@ -2556,8 +2605,8 @@ const bodyRows = rows.map((r, i) => {
         <td><input class="input score-input" style="padding:7px 9px;max-width:82px" type="number" min="0" max="60" data-i="${i}" data-k="exam" value="${r?.exam ?? ""}" placeholder="0" /></td>
         <td class="cell-strong" data-total="${i}">${total === "" ? "—" : total}</td>
         <td data-grade="${i}">${gradeBadge(g)}</td>
-        <td><input class="input score-input" style="padding:7px 9px;max-width:72px" type="text" data-i="${i}" data-k="attendance" value="${esc(r?.attendance ?? "")}" placeholder="18/20" title="Attendance, e.g. 18/20" /></td>
-        <td><input class="input score-input" style="padding:7px 9px;max-width:120px" type="text" data-i="${i}" data-k="remark" value="${esc(r?.remark ?? "")}" placeholder="Remark" title="General remark" /></td>
+        <td><input class="input score-input" style="padding:7px 9px;max-width:82px" type="text" inputmode="decimal" data-i="${i}" data-k="attendance" value="${esc(clampPct(r?.attendance))}" placeholder="85%" title="Attendance percentage (0-100), e.g. 85" /></td>
+        <td><input class="input score-input" style="padding:7px 9px;max-width:150px" type="text" data-i="${i}" data-k="remark" value="${esc(r?.remark ?? "")}" placeholder="Remark" title="General remark shown on the report card" /></td>
         <td class="cell-muted" style="text-align:center"><button type="button" class="icon-btn" data-action="teacher:traits" data-student-id="${esc((r && (r.dbId || r.studentId)) || "")}" data-student-name="${esc(r?.name || "")}" title="Set Affective &amp; Psychomotor traits">${ic.edit}</button></td>
       </tr>`;
   }).join("");
@@ -2677,7 +2726,7 @@ const bodyRows = rows.map((r, i) => {
           </label>
           <input class="input" id="t-sig-file" name="teacherSignature" type="file" accept="image/jpeg,image/png,image/webp" hidden data-action="teacher:signatureUpload" data-preview="t-sig-preview" />
           <div id="t-sig-preview" style="margin-top:6px">
-            ${me && me.signature ? `<img src="${esc(me.signature.contentBase64)}" alt="Teacher signature" style="max-height:56px;max-width:160px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px" />` : `<div class="cell-muted" style="font-size:11px">No signature uploaded yet.</div>`}
+            ${me && me.signature ? `<img src="${esc(signatureSrc(me.signature))}" alt="Teacher signature" style="max-height:56px;max-width:160px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px" />` : `<div class="cell-muted" style="font-size:11px">No signature uploaded yet.</div>`}
           </div>
         </div>
         <div class="field" style="flex:0 0 auto">
@@ -2980,7 +3029,7 @@ function studentResult() {
   }
 
   const sessionLabel = r.session ? r.session.replace("/", " / ") : "2025 / 2026";
-  const attPct = r.attendance && r.attendance.total ? +((r.attendance.present / r.attendance.total) * 100).toFixed(1) : 0;
+  const attendanceText = attendanceLabel(r.attendance);
   const subjRows = r.rows.map((row) => `
     <tr>
       <td class="cell-strong">${esc(row.subject)}</td>
@@ -2998,10 +3047,10 @@ function studentResult() {
     ? (liveReport?.psychomotor || []).map((t) => [t.trait || "", t.rating || ""])
     : (st && Array.isArray(st.psychomotor) ? st.psychomotor.map((t) => [t.trait || "", t.rating || ""]) : []);
 
-  const ctSig = teacherSignatureFor(r.cls || (st ? st.cls : ""), s.id);
-  const prSig = principalSignatureFor(s);
-  const ctSigImg = ctSig ? `<img class="sig-image" src="${esc(ctSig.contentBase64)}" alt="Class teacher signature" />` : "";
-  const prSigImg = prSig ? `<img class="sig-image" src="${esc(prSig.contentBase64)}" alt="Principal signature" />` : "";
+  const ctSig = (LIVE_API && liveReport?.classTeacherSignature) || teacherSignatureFor(r.cls || (st ? st.cls : ""), s.id);
+  const prSig = (LIVE_API && liveReport?.principalSignature) || principalSignatureFor(s);
+  const ctSigImg = ctSig ? `<img class="sig-image" src="${esc(signatureSrc(ctSig))}" alt="Class teacher signature" />` : "";
+  const prSigImg = prSig ? `<img class="sig-image" src="${esc(signatureSrc(prSig))}" alt="Principal signature" />` : "";
 
   return `
   <div class="page result-shell">
@@ -3041,7 +3090,7 @@ function studentResult() {
             <div class="bio-row"><span class="k">Age</span><span class="v">${st ? ageFromDob(st.dob) : "—"} years</span></div>
             <div class="bio-row"><span class="k">No. in Class</span><span class="v">${r.classSize}</span></div>
             <div class="bio-row"><span class="k">Position</span><span class="v">${r.position} of ${r.classSize}</span></div>
-            <div class="bio-row"><span class="k">Attendance</span><span class="v">${r.attendance.present} / ${r.attendance.total} (${attPct}%)</span></div>
+            <div class="bio-row"><span class="k">Attendance</span><span class="v">${esc(attendanceText)}</span></div>
           </div>
         </div>
 
@@ -3073,18 +3122,19 @@ function studentResult() {
 
         <h4 class="section">Class Teacher's Remark</h4>
         <div class="remarks">
-          ${esc(st ? st.name.split(" ")[0] : "The student")} ${esc(r.remark || "has performed satisfactorily")} this term. A little more attention to
-          <strong>${esc(r.rows.length ? r.rows[r.rows.length - 1].subject : "core subjects")}</strong> will help reach the top of the class. Keep it up!
+          ${r.remark
+            ? esc(r.remark)
+            : `${esc(st ? st.name.split(" ")[0] : "The student")} has performed satisfactorily this term. A little more attention to <strong>${esc(r.rows.length ? r.rows[r.rows.length - 1].subject : "core subjects")}</strong> will help reach the top of the class. Keep it up!`}
         </div>
 
         <div class="sign-row">
           <div class="sign">
-            <div class="line"><span class="sig-name" id="ct-sign-name">${esc(classTeacherName(r.cls || (st ? st.cls : ""), s.id))}</span></div>
+            <div class="line"><span class="sig-name" id="ct-sign-name">${esc((LIVE_API && liveReport?.classTeacherName) || classTeacherName(r.cls || (st ? st.cls : ""), s.id))}</span></div>
             ${ctSigImg}
             <div class="role">Class Teacher</div>
           </div>
           <div class="sign">
-            <div class="line"><span class="sig-name" id="pr-sign-name">${esc(principalName(s))}</span></div>
+            <div class="line"><span class="sig-name" id="pr-sign-name">${esc((LIVE_API && liveReport?.principalName) || principalName(s))}</span></div>
             ${prSigImg}
             <div class="role">Principal</div>
           </div>
@@ -3364,7 +3414,7 @@ case "student:genPass": {
           const preview = document.getElementById("t-sig-preview");
           if (preview) preview.innerHTML = `<img src="data:${sig.contentType};base64,${sig.contentBase64}" alt="Signature preview" style="max-height:56px;max-width:160px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px" /><div class="cell-muted" style="font-size:11px;margin-top:6px">${esc(file.name)} · ready to upload</div>`;
           const confirmed = await confirmAction("Confirm signature upload?", `Upload ${file.name} as your signature? It will appear on every printed report card under your name.`, "Upload Signature", "Keep editing");
-          if (!confirmed) { if (preview) preview.innerHTML = me && me.signature ? `<img src="${esc(me.signature.contentBase64)}" alt="Teacher signature" style="max-height:56px;max-width:160px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px" />` : `<div class="cell-muted" style="font-size:11px">No signature uploaded yet.</div>`; input.value = ""; return; }
+          if (!confirmed) { if (preview) preview.innerHTML = me && me.signature ? `<img src="${esc(signatureSrc(me.signature))}" alt="Teacher signature" style="max-height:56px;max-width:160px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px" />` : `<div class="cell-muted" style="font-size:11px">No signature uploaded yet.</div>`; input.value = ""; return; }
           const teacher = await SyntaxApi.teacher.updateMySignature(sig);
           liveUpsertTeacher(teacher);
           toast("Signature saved", "Your signature is now shown on printed results.", "success");
@@ -3386,7 +3436,7 @@ case "student:genPass": {
           const preview = document.getElementById("pr-sig-preview");
           if (preview) preview.innerHTML = `<img src="data:${sig.contentType};base64,${sig.contentBase64}" alt="Signature preview" style="max-height:90px;max-width:220px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:6px" /><div class="cell-muted" style="font-size:12px;margin-top:6px">${esc(file.name)} · ready to upload</div>`;
           const confirmed = await confirmAction("Confirm principal signature upload?", `Upload ${file.name} as the principal's signature? It will appear on every printed report card under the Principal line.`, "Upload Signature", "Keep editing");
-          if (!confirmed) { if (preview) preview.innerHTML = s && s.principalSignature ? `<img src="${esc(s.principalSignature.contentBase64)}" alt="Principal signature" style="max-height:90px;max-width:220px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:6px" />` : `<div class="cell-muted" style="padding:14px;border:1px dashed var(--border);border-radius:8px;text-align:center">No signature uploaded yet.</div>`; input.value = ""; return; }
+          if (!confirmed) { if (preview) preview.innerHTML = s && s.principalSignature ? `<img src="${esc(signatureSrc(s.principalSignature))}" alt="Principal signature" style="max-height:90px;max-width:220px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:6px" />` : `<div class="cell-muted" style="padding:14px;border:1px dashed var(--border);border-radius:8px;text-align:center">No signature uploaded yet.</div>`; input.value = ""; return; }
           const school = await SyntaxApi.admin.updateProfile({ principalSignature: sig });
           liveUpsertSchool(school);
           state.school = schoolById(school.id);
@@ -3872,7 +3922,7 @@ case "student:genPass": {
         const groupRows = state.assessments.filter((x) => String(x.schoolId) === String(a.schoolId) && String(x.classId || "") === String(a.classId || "") && normClass(x.cls) === normClass(a.cls) && String(x.subject).toLowerCase() === String(a.subject).toLowerCase() && x.term === a.term && x.session === a.session);
         assessmentDetailsModal({
           group: { id: a.id, classId: a.classId, className: a.cls, subject: a.subject, teacherEmail: a.teacherEmail || a.teacher, term: a.term, session: a.session, submittedAt: a.submittedAt },
-          rows: groupRows.map((r) => ({ studentId: r.studentId, studentName: r.studentId, ca1: r.ca1, ca2: r.ca2, exam: r.exam, total: r.total, grade: r.grade, affective: [], psychomotor: [] })),
+          rows: groupRows.map((r) => ({ studentId: r.studentId, studentName: r.studentId, ca1: r.ca1, ca2: r.ca2, exam: r.exam, total: r.total, grade: r.grade, attendance: r.attendance || "", remark: r.remark || "", affective: [], psychomotor: [] })),
         });
         break;
       }
@@ -4143,8 +4193,24 @@ document.addEventListener("input", (e) => {
   const i = Number(el.getAttribute("data-i"));
   const k = el.getAttribute("data-k");
   const rows = ensureScores(state.teacherCls, state.teacherSubj);
-  // Attendance and remark are free text; only score columns are clamped.
-  if (k === "attendance" || k === "remark") {
+  // Attendance is a percentage (0-100); a fraction like "18/20" is also allowed.
+  // Remark is free text. Score columns are clamped to their maxima.
+  if (k === "attendance") {
+    const raw = el.value.trim();
+    const frac = raw.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+    if (frac) {
+      rows[i].attendance = raw;
+    } else {
+      const num = Number(raw.replace(/%/g, ""));
+      if (raw === "" || isNaN(num)) {
+        rows[i].attendance = raw;
+      } else {
+        const clamped = Math.max(0, Math.min(100, num));
+        if (clamped !== num) el.value = String(clamped);
+        rows[i].attendance = String(clamped);
+      }
+    }
+  } else if (k === "remark") {
     rows[i][k] = el.value;
   } else {
     let val = el.value === "" ? "" : Math.max(0, Math.min(Number(el.value), Number(el.getAttribute("max"))));
@@ -5133,6 +5199,7 @@ async function liveLoadTeacherData() {
       classesTaught: 0,
       status: "Active",
       verified: true,
+      signature: schoolData.teacherSignature || null,
     });
   }
   state.classes = classRows.map((item) => {

@@ -632,6 +632,8 @@ export async function getAssessmentDetails(schoolId: string, assessmentId: strin
         exam: r.exam,
         total: r.total,
         grade: r.grade,
+        attendance: r.attendance || '',
+        remark: r.remark || '',
         status: r.status,
         affective: tr?.affective || [],
         psychomotor: tr?.psychomotor || [],
