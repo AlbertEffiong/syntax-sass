@@ -30,6 +30,8 @@ export interface ReportCard {
     fullName: string;
     gender: string;
     currentClass: string;
+    /** Date of birth (YYYY-MM-DD) used to derive the age on the report card. */
+    dob?: string;
     feeDue: number;
   };
   term: string;
@@ -169,6 +171,7 @@ export async function getResults(input: GetResultsInput): Promise<ReportCard> {
       fullName: student.fullName,
       gender: student.gender,
       currentClass: student.currentClass,
+      dob: student.dob ? student.dob.toISOString().slice(0, 10) : '',
       feeDue: student.feeDue ?? 0,
     },
     term,
@@ -275,6 +278,7 @@ function buildFromHistory(
       fullName: doc.fullName,
       gender: doc.gender,
       currentClass: doc.currentClass,
+      dob: doc.dob ? doc.dob.toISOString().slice(0, 10) : '',
       feeDue: doc.feeDue ?? 0,
     },
     term: history.term,

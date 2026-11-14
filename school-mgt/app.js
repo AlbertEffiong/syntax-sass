@@ -2484,7 +2484,7 @@ function assessmentDetailsModal(details) {
   const body = rows.map((r, i) => `
     <tr>
       <td class="cell-muted">${i + 1}</td>
-      <td><div class="cell-strong">${esc(r.studentName || r.studentId || "—")}</div><div class="cell-muted">${esc(r.studentId || "")}</div></td>
+      <td><div class="cell-strong">${esc(r.studentName || r.studentId || "—")}</div><div class="cell-muted">${esc(r.studentId || "")}${r.dob ? " · " + esc(ageFromDob(r.dob)) + " yrs" : ""}</div></td>
       <td>${r.ca1 ?? "—"}</td><td>${r.ca2 ?? "—"}</td><td>${r.exam ?? "—"}</td>
       <td class="cell-strong">${r.total ?? "—"}</td>
       <td><span class="badge ${r.grade === "F" ? "badge-expired" : r.grade ? "badge-active" : "badge-muted"}">${esc(r.grade || "—")}</span></td>
@@ -3087,7 +3087,7 @@ function studentResult() {
             <div class="bio-row"><span class="k">Student ID</span><span class="v code">${esc(st ? st.id : "—")}</span></div>
             <div class="bio-row"><span class="k">Class</span><span class="v">${esc(r.cls || (st ? st.cls : "—"))}</span></div>
             <div class="bio-row"><span class="k">Gender</span><span class="v">${esc(st && st.gender ? st.gender : "—")}</span></div>
-            <div class="bio-row"><span class="k">Age</span><span class="v">${st ? ageFromDob(st.dob) : "—"} years</span></div>
+            <div class="bio-row"><span class="k">Age</span><span class="v">${esc(ageFromDob((LIVE_API && liveReport?.student?.dob) || (st && st.dob)))} years</span></div>
             <div class="bio-row"><span class="k">No. in Class</span><span class="v">${r.classSize}</span></div>
             <div class="bio-row"><span class="k">Position</span><span class="v">${r.position} of ${r.classSize}</span></div>
             <div class="bio-row"><span class="k">Attendance</span><span class="v">${esc(attendanceText)}</span></div>

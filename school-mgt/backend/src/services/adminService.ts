@@ -597,7 +597,7 @@ export async function getAssessmentDetails(schoolId: string, assessmentId: strin
   const rows = await Assessment.find(filter).sort({ studentId: 1 });
   const studentIds = Array.from(new Set(rows.map((r) => String(r.studentId).toUpperCase())));
   const students = studentIds.length
-    ? await Student.find({ schoolId, studentId: { $in: studentIds } }).select('_id studentId fullName')
+    ? await Student.find({ schoolId, studentId: { $in: studentIds } }).select('_id studentId fullName dob')
     : [];
   const studentById = new Map(students.map((s) => [String(s.studentId).toUpperCase(), s]));
   const refIds = students.map((s) => s._id);
@@ -627,6 +627,7 @@ export async function getAssessmentDetails(schoolId: string, assessmentId: strin
         assessmentId: String(r._id),
         studentId: r.studentId,
         studentName: st ? st.fullName : r.studentId,
+        dob: st?.dob ? st.dob.toISOString().slice(0, 10) : '',
         ca1: r.ca1,
         ca2: r.ca2,
         exam: r.exam,
