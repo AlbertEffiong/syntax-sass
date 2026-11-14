@@ -825,7 +825,7 @@ function authTeacherForm() {
 function authStudentForm() {
   const s = demoSchool();
   if (isSubscriptionLocked(s)) return studentBlockedPanel(s);
-  const sample = state.students.find((st) => st.schoolId === s.id) || state.students[0];
+  const sample = state.students.find((st) => s && st.schoolId === s.id) || state.students[0];
   return `
     <form data-action="form:studentlogin">
       <div class="pin-row">
@@ -2946,14 +2946,14 @@ function studentApp() {
 
 function studentLogin() {
   const s = demoSchool();
-  const sample = state.students.find((st) => st.schoolId === s.id) || state.students[0];
+  const sample = state.students.find((st) => s && st.schoolId === s.id) || state.students[0];
   const samplePassword = sample ? (sample.password || DEFAULT_PIN) : DEFAULT_PIN;
   return `
   <div class="login-wrap">
     <div class="login-card">
       <div class="login-logo">${ic.cap}</div>
       <h1>Result Checking Portal</h1>
-      <div class="sub">Enter your Student ID and password to view your ${esc(s.name)} term result.</div>
+      <div class="sub">Enter your Student ID and password to view your ${esc(s ? s.name : "school")} term result.</div>
       <form data-action="form:studentlogin">
         <div class="pin-row">
           <div class="field">
