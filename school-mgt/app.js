@@ -3064,7 +3064,7 @@ function studentResult() {
     <div class="result-actions">
       <div class="field principal-field">
         <label for="pr-name">Principal Name <span class="hint">(renders on the report)</span></label>
-        <input class="input" id="pr-name" data-action="principal:set" value="${esc(principalName(s))}" placeholder="e.g. A. Bello" autocomplete="off" />
+        <input class="input" id="pr-name" data-action="principal:set" value="${esc((LIVE_API && liveReport?.principalName) || principalName(s))}" placeholder="e.g. A. Bello" autocomplete="off" />
       </div>
       <button class="btn btn-ghost" data-action="student:logout">${ic.logout}<span>Sign Out</span></button>
       <button class="btn btn-ghost" data-action="student:print">${ic.print}<span>Print</span></button>
@@ -5325,7 +5325,11 @@ async function liveLoadStudentResult(term) {
     state.liveStudentReport = await SyntaxApi.student.results({ term: term || "First Term" });
     const report = state.liveStudentReport;
     if (report.student) liveUpsertStudent({ ...report.student, schoolId: report.schoolId || state.school?.id });
-    if (report.schoolName && state.school) state.school.name = report.schoolName;
+    if (state.school) {
+      if (report.schoolName) state.school.name = report.schoolName;
+      if (report.principalName) state.school.principalName = report.principalName;
+      if (report.principalSignature) state.school.principalSignature = report.principalSignature;
+    }
   } catch (err) {
     state.liveStudentResultsError = err;
   }
