@@ -3254,6 +3254,60 @@ document.addEventListener("focusout", () => { if (tipSrc) tipHide(); });
 /* ============================================================
    Event handling
    ============================================================ */
+
+/**
+ * Reads the chosen signature file, previews it, asks for confirmation and then
+ * uploads it. Invoked from the file input's `change` event (so picking a file
+ * is enough) as well as the Upload button.
+ */
+async function uploadTeacherSignature(input) {
+  if (!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const me = teacherById(state.auth.teacher && state.auth.teacher.teacherId);
+  try {
+    const sig = await readSignatureFile(file);
+    const preview = document.getElementById("t-sig-preview");
+    if (preview) preview.innerHTML = `<img src="data:${sig.contentType};base64,${sig.contentBase64}" alt="Signature preview" style="max-height:56px;max-width:160px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px" /><div class="cell-muted" style="font-size:11px;margin-top:6px">${esc(file.name)} · ready to upload</div>`;
+    const confirmed = await confirmAction("Confirm signature upload?", `Upload ${file.name} as your signature? It will appear on every printed report card under your name.`, "Upload Signature", "Keep editing");
+    if (!confirmed) {
+      if (preview) preview.innerHTML = me && me.signature ? `<img src="${esc(signatureSrc(me.signature))}" alt="Teacher signature" style="max-height:56px;max-width:160px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px" />` : `<div class="cell-muted" style="font-size:11px">No signature uploaded yet.</div>`;
+      input.value = "";
+      return;
+    }
+    const teacher = await SyntaxApi.teacher.updateMySignature(sig);
+    liveUpsertTeacher(teacher);
+    toast("Signature saved", "Your signature is now shown on printed results.", "success");
+    render();
+  } catch (err) {
+    toast("Signature upload failed", err.message || "Could not save your signature.", "error");
+  }
+}
+
+/** Principal signature counterpart of {@link uploadTeacherSignature}. */
+async function uploadAdminSignature(input) {
+  if (!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const s = state.school;
+  try {
+    const sig = await readSignatureFile(file);
+    const preview = document.getElementById("pr-sig-preview");
+    if (preview) preview.innerHTML = `<img src="data:${sig.contentType};base64,${sig.contentBase64}" alt="Signature preview" style="max-height:90px;max-width:220px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:6px" /><div class="cell-muted" style="font-size:12px;margin-top:6px">${esc(file.name)} · ready to upload</div>`;
+    const confirmed = await confirmAction("Confirm principal signature upload?", `Upload ${file.name} as the principal's signature? It will appear on every printed report card under the Principal line.`, "Upload Signature", "Keep editing");
+    if (!confirmed) {
+      if (preview) preview.innerHTML = s && s.principalSignature ? `<img src="${esc(signatureSrc(s.principalSignature))}" alt="Principal signature" style="max-height:90px;max-width:220px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:6px" />` : `<div class="cell-muted" style="padding:14px;border:1px dashed var(--border);border-radius:8px;text-align:center">No signature uploaded yet.</div>`;
+      input.value = "";
+      return;
+    }
+    const school = await SyntaxApi.admin.updateProfile({ principalSignature: sig });
+    liveUpsertSchool(school);
+    state.school = schoolById(school.id);
+    toast("Principal signature saved", "The signature is now shown on printed results.", "success");
+    render();
+  } catch (err) {
+    toast("Signature upload failed", err.message || "Could not save the principal signature.", "error");
+  }
+}
+
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-action]");
   if (!btn) return;
@@ -3404,48 +3458,19 @@ case "student:genPass": {
       break;
     }
     case "teacher:signatureUpload": {
-      const input = document.getElementById("t-sig-file");
-      if (!input || !input.files || !input.files[0]) { toast("No file selected", "Choose a JPG, PNG or WebP signature image.", "error"); break; }
-      const file = input.files[0];
-      (async () => {
-        try {
-          const sig = await readSignatureFile(file);
-          // Show the chosen image for confirmation before uploading.
-          const preview = document.getElementById("t-sig-preview");
-          if (preview) preview.innerHTML = `<img src="data:${sig.contentType};base64,${sig.contentBase64}" alt="Signature preview" style="max-height:56px;max-width:160px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px" /><div class="cell-muted" style="font-size:11px;margin-top:6px">${esc(file.name)} · ready to upload</div>`;
-          const confirmed = await confirmAction("Confirm signature upload?", `Upload ${file.name} as your signature? It will appear on every printed report card under your name.`, "Upload Signature", "Keep editing");
-          if (!confirmed) { if (preview) preview.innerHTML = me && me.signature ? `<img src="${esc(signatureSrc(me.signature))}" alt="Teacher signature" style="max-height:56px;max-width:160px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px" />` : `<div class="cell-muted" style="font-size:11px">No signature uploaded yet.</div>`; input.value = ""; return; }
-          const teacher = await SyntaxApi.teacher.updateMySignature(sig);
-          liveUpsertTeacher(teacher);
-          toast("Signature saved", "Your signature is now shown on printed results.", "success");
-          render();
-        } catch (err) {
-          toast("Signature upload failed", err.message || "Could not save your signature.", "error");
-        }
-      })();
+      // The hidden input carries this action too (label click); only a button
+      // with a target should open the picker. The upload itself runs on change.
+      if (btn.tagName === "BUTTON" || btn.getAttribute("data-target")) {
+        const input = document.getElementById(btn.getAttribute("data-target") || "t-sig-file");
+        if (input) { input.value = ""; input.click(); }
+      }
       break;
     }
     case "admin:signatureUpload": {
-      const input = document.getElementById("pr-sig-file");
-      if (!input || !input.files || !input.files[0]) { toast("No file selected", "Choose a JPG, PNG or WebP signature image.", "error"); break; }
-      const file = input.files[0];
-      const s = state.school;
-      (async () => {
-        try {
-          const sig = await readSignatureFile(file);
-          const preview = document.getElementById("pr-sig-preview");
-          if (preview) preview.innerHTML = `<img src="data:${sig.contentType};base64,${sig.contentBase64}" alt="Signature preview" style="max-height:90px;max-width:220px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:6px" /><div class="cell-muted" style="font-size:12px;margin-top:6px">${esc(file.name)} · ready to upload</div>`;
-          const confirmed = await confirmAction("Confirm principal signature upload?", `Upload ${file.name} as the principal's signature? It will appear on every printed report card under the Principal line.`, "Upload Signature", "Keep editing");
-          if (!confirmed) { if (preview) preview.innerHTML = s && s.principalSignature ? `<img src="${esc(signatureSrc(s.principalSignature))}" alt="Principal signature" style="max-height:90px;max-width:220px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:6px" />` : `<div class="cell-muted" style="padding:14px;border:1px dashed var(--border);border-radius:8px;text-align:center">No signature uploaded yet.</div>`; input.value = ""; return; }
-          const school = await SyntaxApi.admin.updateProfile({ principalSignature: sig });
-          liveUpsertSchool(school);
-          state.school = schoolById(school.id);
-          toast("Principal signature saved", "The signature is now shown on printed results.", "success");
-          render();
-        } catch (err) {
-          toast("Signature upload failed", err.message || "Could not save the principal signature.", "error");
-        }
-      })();
+      if (btn.tagName === "BUTTON" || btn.getAttribute("data-target")) {
+        const input = document.getElementById(btn.getAttribute("data-target") || "pr-sig-file");
+        if (input) { input.value = ""; input.click(); }
+      }
       break;
     }
     case "student:edit": {
@@ -4098,6 +4123,14 @@ document.addEventListener("change", (e) => {
         toast("No matching scores", "Ensure the file uses columns Student, CA1, CA2, Exam.", "error");
       }
     });
+    return;
+  }
+  if (action === "teacher:signatureUpload") {
+    uploadTeacherSignature(el);
+    return;
+  }
+  if (action === "admin:signatureUpload") {
+    uploadAdminSignature(el);
     return;
   }
   if (action === "student:feeToggle") {
