@@ -3076,8 +3076,8 @@ function studentResult() {
         <div class="report-logo">${ic.cap}</div>
         <div class="report-school">
           <h2>${esc(s.name)}</h2>
-          <div class="addr">${esc(s.address)}</div>
-          <div class="tag">${esc(s.tag)}</div>
+          ${s.address ? `<div class="addr">${esc(s.address)}</div>` : ""}
+          ${s.tag ? `<div class="tag">${esc(s.tag)}</div>` : ""}
         </div>
       </div>
 
