@@ -3,6 +3,7 @@ import { Student, IStudentDocument } from '../models/Student';
 import { StudentTrait } from '../models/StudentTrait';
 import { Teacher } from '../models/Teacher';
 import { Assessment } from '../models/Assessment';
+import type { IAssessmentDocument } from '../models/Assessment';
 import { ClassModel } from '../models/Class';
 import { ApiError } from '../utils/ApiError';
 import { gradeFor, remarkFor } from '../utils/grading';
@@ -191,6 +192,89 @@ export async function getResults(input: GetResultsInput): Promise<ReportCard> {
     psychomotor,
     published: true,
   };
+}
+
+export interface AcademicRecord {
+  session: string;
+  term: string;
+  class: string;
+  subjects: Array<{ subject: string; score: number; grade: string; remark?: string }>;
+  total: number;
+  average: number;
+  position: number;
+  classSize: number;
+  attendance: string;
+  remark: string;
+}
+
+/**
+ * Builds a student's full academic record (every term with assessments) for the
+ * admin profile. Unlike `getResults`, this is not limited to approved rows so
+ * the principal can review work that is still pending approval.
+ */
+export async function getStudentAcademicRecord(input: {
+  schoolId: string;
+  studentRef: string;
+}): Promise<AcademicRecord[]> {
+  const student = await Student.findById(input.studentRef);
+  if (!student) throw ApiError.notFound('Student not found.', 'STUDENT_NOT_FOUND');
+  assertSameSchool(student.schoolId, input.schoolId);
+
+  const rows = await Assessment.find({
+    schoolId: input.schoolId,
+    studentRef: student._id,
+  }).sort({ session: 1, term: 1 });
+
+  const groups = new Map<string, IAssessmentDocument[]>();
+  for (const row of rows) {
+    const key = `${row.session}|${row.term}`;
+    const list = groups.get(key);
+    if (list) list.push(row);
+    else groups.set(key, [row]);
+  }
+
+  const termOrder: Record<string, number> = { 'First Term': 1, 'Second Term': 2, 'Third Term': 3 };
+  const records: AcademicRecord[] = [];
+
+  for (const group of groups.values()) {
+    if (!group.length) continue;
+    const first = group[0];
+    const subjects = group
+      .map((a) => ({
+        subject: a.subject,
+        score: a.total,
+        grade: a.grade || gradeFor(a.total),
+        remark: remarkFor(a.total),
+      }))
+      .sort((x, y) => x.subject.localeCompare(y.subject));
+    const total = subjects.reduce((sum, s) => sum + s.score, 0);
+    const average = subjects.length ? Math.round((total / subjects.length) * 10) / 10 : 0;
+    const { position, classSize } = await rankStudent(
+      input.schoolId,
+      first.className,
+      student.studentId,
+      first.term,
+      first.session,
+    );
+    records.push({
+      session: first.session,
+      term: first.term,
+      class: first.className,
+      subjects,
+      total,
+      average,
+      position,
+      classSize,
+      attendance: group.find((a) => (a.attendance || '').trim())?.attendance || '',
+      remark: group.find((a) => (a.remark || '').trim())?.remark || '',
+    });
+  }
+
+  records.sort((a, b) => {
+    if (a.session !== b.session) return a.session.localeCompare(b.session);
+    return (termOrder[a.term] || 0) - (termOrder[b.term] || 0);
+  });
+  return records;
 }
 
 async function resolveTermSession(

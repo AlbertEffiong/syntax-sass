@@ -282,6 +282,9 @@
     getStudent: function (id) {
       return get('/api/admin/students/' + encodeURIComponent(id));
     },
+    getStudentRecord: function (id) {
+      return get('/api/admin/students/' + encodeURIComponent(id) + '/record');
+    },
     updateStudent: function (id, payload) {
       return patch('/api/admin/students/' + encodeURIComponent(id), payload);
     },

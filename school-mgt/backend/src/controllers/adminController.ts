@@ -5,6 +5,7 @@ import { ApiError } from '../utils/ApiError';
 import { resolvePagination } from '../utils/pagination';
 import * as adminService from '../services/adminService';
 import * as authService from '../services/authService';
+import * as studentService from '../services/studentService';
 import * as uploadService from '../services/uploadService';
 import {
   CreateClassBody,
@@ -80,6 +81,18 @@ export const listStudents = asyncHandler(async (req: Request, res: Response) => 
 export const getStudent = asyncHandler(async (req: Request, res: Response) => {
   const student = await adminService.getStudent(requireTenant(req), req.params.id);
   return ok(res, student);
+});
+
+/**
+ * GET /api/admin/students/:id/record
+ * Full academic record (every term with assessments) for the student profile.
+ */
+export const getStudentRecord = asyncHandler(async (req: Request, res: Response) => {
+  const record = await studentService.getStudentAcademicRecord({
+    schoolId: requireTenant(req),
+    studentRef: req.params.id,
+  });
+  return ok(res, record);
 });
 
 export const updateStudent = asyncHandler(async (req: Request, res: Response) => {

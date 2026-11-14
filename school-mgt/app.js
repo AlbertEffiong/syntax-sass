@@ -447,9 +447,19 @@ function pickHistory(st, term) {
 }
 function attendanceRate(st) {
   const hist = (st && st.history) || [];
-  const present = hist.reduce((a, h) => a + h.attendance.present, 0);
-  const total = hist.reduce((a, h) => a + h.attendance.total, 0) || 1;
-  return { present, total, pct: +((present / total) * 100).toFixed(1) };
+  const withTotals = hist.filter((h) => h.attendance && Number(h.attendance.total) > 0);
+  if (withTotals.length) {
+    const present = withTotals.reduce((a, h) => a + Number(h.attendance.present || 0), 0);
+    const total = withTotals.reduce((a, h) => a + Number(h.attendance.total || 0), 0) || 1;
+    return { present, total, pct: +((present / total) * 100).toFixed(1) };
+  }
+  const percents = hist
+    .map((h) => (h.attendance ? Number(h.attendance.percent) : NaN))
+    .filter((v) => !isNaN(v));
+  if (percents.length) {
+    return { present: 0, total: 0, pct: +(percents.reduce((a, b) => a + b, 0) / percents.length).toFixed(1) };
+  }
+  return { present: 0, total: 0, pct: 0 };
 }
 function latestAverage(st) {
   const hist = (st && st.history) || [];
@@ -1572,10 +1582,7 @@ function studentModal(st) {
 
 function mapHistoricalResult(h) {
   if (!h) return null;
-  const attStr = String(h.attendance || "").trim();
-  let present = 0, total = 0;
-  const m = attStr.match(/(\d+)\s*\/\s*(\d+)/);
-  if (m) { present = Number(m[1]) || 0; total = Number(m[2]) || 0; }
+  const att = parseAttendance(h.attendance);
   const subjects = Array.isArray(h.subjects) ? h.subjects.map((s) => ({
     subject: s.subject || "", ca: 0, exam: 0, total: Number(s.score) || 0, grade: s.grade || gradeFor(Number(s.score) || 0), remark: s.remark || "",
   })) : [];
@@ -1584,7 +1591,7 @@ function mapHistoricalResult(h) {
     session: h.session || "", year: Number(String(h.session || "").slice(0, 4)) || 0, term: h.term || "",
     cls: h.class || h.cls || "", subjects, total: Number(h.total) || 0, average: avg,
     position: Number(h.position) || 0, classSize: Number(h.classSize) || 0,
-    attendance: { present, total },
+    attendance: { present: att.present, total: att.total, percent: att.percent },
     remark: h.remark || remarkForGrade(gradeFor(Math.round(avg))),
   };
 }
@@ -1605,8 +1612,8 @@ function studentProfileModal(st) {
       <td><span class="badge badge-info">${esc(h.cls)}</span></td>
       <td>${h.subjects.length}</td>
       <td class="cell-strong">${h.average}%</td>
-      <td>${ordinal(h.position)} / ${h.classSize}</td>
-      <td>${h.attendance.present}/${h.attendance.total}</td>
+      <td>${h.classSize ? ordinal(h.position) + " / " + h.classSize : "—"}</td>
+      <td>${esc(attendanceLabel(h.attendance))}</td>
       <td><span class="badge ${h.average >= 60 ? "badge-active" : h.average >= 45 ? "badge-grace" : "badge-expired"}">${esc(h.remark)}</span></td>
     </tr>`).join("") : `<tr><td colspan="8" class="cell-muted" style="text-align:center;padding:18px">No academic records yet.</td></tr>`;
   openModal(`
@@ -3421,15 +3428,22 @@ document.addEventListener("click", async (e) => {
       if (!st) break;
       if (LIVE_API && st.dbId) {
         try {
-          const detail = await SyntaxApi.admin.getStudent(st.dbId);
+          const [detail, record] = await Promise.all([
+            SyntaxApi.admin.getStudent(st.dbId),
+            SyntaxApi.admin.getStudentRecord(st.dbId).catch(() => []),
+          ]);
           if (detail && Array.isArray(detail.historicalResults) && detail.historicalResults.length) {
             st.history = mapHistoricalResults(detail.historicalResults);
+          }
+          if (Array.isArray(record) && record.length) {
+            st.history = mapHistoricalResults(record);
           }
           if (detail) {
             st.email = detail.email || st.email;
             st.address = detail.address || st.address;
             st.guardian = detail.guardian || st.guardian;
             st.contact = detail.contact || st.contact;
+            if (detail.dob) st.dob = detail.dob;
           }
         } catch (err) {
           /* fall back to local history */
